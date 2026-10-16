@@ -38,12 +38,12 @@ test('budgetReport: solo categorías con presupuesto, incluidas las sin gastos, 
 test('validateCategory acepta una categoría correcta y rechaza cada campo inválido', () => {
   const ok = { name: 'Mascotas', icon: '🐶', color: '#16a34a', monthly_budget: null };
   const others = ['Comida', 'Bajón'];
-  assert.equal(validateCategory(ok, others), '');
-  assert.equal(validateCategory({ ...ok, monthly_budget: 30_000 }, others), '');
-  assert.match(validateCategory({ ...ok, name: '   ' }, others), /nombre/);
-  assert.match(validateCategory({ ...ok, name: 'x'.repeat(41) }, others), /nombre/);
-  assert.match(validateCategory({ ...ok, name: ' bajón ' }, others), /Ya tienes/);
-  assert.match(validateCategory({ ...ok, icon: '🐶'.repeat(9) }, others), /emoji/);
-  assert.match(validateCategory({ ...ok, color: 'rojo' }, others), /color/);
-  assert.match(validateCategory({ ...ok, monthly_budget: 0 }, others), /presupuesto/);
+  assert.equal(validateCategory(ok, others), null);
+  assert.equal(validateCategory({ ...ok, monthly_budget: 30_000 }, others), null);
+  assert.match(validateCategory({ ...ok, name: '   ' }, others).message, /nombre/);
+  assert.match(validateCategory({ ...ok, name: 'x'.repeat(41) }, others).message, /nombre/);
+  assert.match(validateCategory({ ...ok, name: ' bajón ' }, others).message, /Ya tienes/);
+  assert.match(validateCategory({ ...ok, icon: '🐶'.repeat(9) }, others).message, /emoji/);
+  assert.match(validateCategory({ ...ok, color: 'rojo' }, others).message, /color/);
+  assert.match(validateCategory({ ...ok, monthly_budget: 0 }, others).message, /presupuesto/);
 });

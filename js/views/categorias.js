@@ -72,14 +72,18 @@ async function onSubmit(ev) {
     monthly_budget: Number.isNaN(budget) ? null : budget,
   };
   const otherNames = state.categories.filter((c) => c.id !== editing?.id).map((c) => c.name);
-  const error = validateCategory(row, otherNames);
-  $('#c-error').textContent = error;
-  if (error) return;
+  const invalid = validateCategory(row, otherNames);
+  $('#c-error').textContent = invalid?.message ?? '';
+  if (invalid) {
+    $(`#c-${invalid.field}`).focus();
+    return;
+  }
   await withBusy($('#c-save'), $('#c-error'), async () => {
     await saveCategory(row);
     closeForm();
     toast(editing ? 'Categoría actualizada' : 'Categoría creada');
     await onChange();
+    $('#cat-add').focus(); // la tarjeta que abrió el formulario se redibujó
   }, errorMessage);
 }
 
@@ -96,6 +100,7 @@ async function onDelete() {
     closeForm();
     toast('Categoría eliminada');
     await onChange();
+    $('#cat-add').focus();
   }, errorMessage);
 }
 

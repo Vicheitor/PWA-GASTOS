@@ -4,13 +4,13 @@ import {
   normalizeText, textLength,
 } from './format.js';
 
-// '' si el gasto es válido; si no, el mensaje para el usuario. Mismas reglas que schema.sql.
+// null si el gasto es válido; si no, { field, message } (campo a enfocar). Mismas reglas que schema.sql.
 export function validateExpense({ amount, category_id, spent_on, note }, categoryIds) {
-  if (!isValidAmount(amount)) return `Ingresa un monto entre $1 y ${formatCLP(MAX_AMOUNT)}.`;
-  if (!categoryIds.has(category_id)) return 'Elige una categoría.';
-  if (!isValidISODate(spent_on)) return 'Ingresa una fecha válida.';
-  if (note && textLength(note) > MAX_NOTE) return `La nota puede tener hasta ${MAX_NOTE} caracteres.`;
-  return '';
+  if (!isValidAmount(amount)) return { field: 'amount', message: `Ingresa un monto entre $1 y ${formatCLP(MAX_AMOUNT)}.` };
+  if (!categoryIds.has(category_id)) return { field: 'category', message: 'Elige una categoría.' };
+  if (!isValidISODate(spent_on)) return { field: 'spent_on', message: 'Ingresa una fecha válida.' };
+  if (note && textLength(note) > MAX_NOTE) return { field: 'note', message: `La nota puede tener hasta ${MAX_NOTE} caracteres.` };
+  return null;
 }
 
 // Igual que las políticas RLS de schema.sql: editar/eliminar solo durante 12 h desde la creación.
@@ -129,17 +129,21 @@ export function budgetReport(categories, expenses) {
 
 const MAX_ICON = 8; // CHECK de schema.sql (en caracteres, como char_length)
 
-// '' si es válida; si no, el mensaje. otherNames: nombres de las demás categorías.
+// null si es válida; si no, { field, message }. otherNames: nombres de las demás categorías.
 export function validateCategory({ name, icon, color, monthly_budget }, otherNames) {
   const clean = name.trim();
   const length = textLength(clean);
-  if (length < 1 || length > MAX_CATEGORY_NAME) return `El nombre debe tener entre 1 y ${MAX_CATEGORY_NAME} caracteres.`;
-  const key = clean.toLocaleLowerCase('es');
-  if (otherNames.some((n) => n.trim().toLocaleLowerCase('es') === key)) return 'Ya tienes una categoría con ese nombre.';
-  if (icon && textLength(icon) > MAX_ICON) return 'El emoji es demasiado largo.';
-  if (!/^#[0-9a-fA-F]{6}$/.test(color)) return 'Elige un color válido.';
-  if (monthly_budget !== null && !isValidAmount(monthly_budget)) {
-    return `El presupuesto debe ser entre $1 y ${formatCLP(MAX_AMOUNT)}.`;
+  if (length < 1 || length > MAX_CATEGORY_NAME) {
+    return { field: 'name', message: `El nombre debe tener entre 1 y ${MAX_CATEGORY_NAME} caracteres.` };
   }
-  return '';
+  const key = clean.toLocaleLowerCase('es');
+  if (otherNames.some((n) => n.trim().toLocaleLowerCase('es') === key)) {
+    return { field: 'name', message: 'Ya tienes una categoría con ese nombre.' };
+  }
+  if (icon && textLength(icon) > MAX_ICON) return { field: 'icon', message: 'El emoji es demasiado largo.' };
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) return { field: 'color', message: 'Elige un color válido.' };
+  if (monthly_budget !== null && !isValidAmount(monthly_budget)) {
+    return { field: 'budget', message: `El presupuesto debe ser entre $1 y ${formatCLP(MAX_AMOUNT)}.` };
+  }
+  return null;
 }

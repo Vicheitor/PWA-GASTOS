@@ -12,7 +12,8 @@ import { mountCategories, showCategories } from './views/categorias.js';
 import { mountBackup } from './views/respaldo.js';
 import { resizeCharts, showSummary } from './views/resumen.js';
 import { addMonths, formatCLP, monthLabel, monthRange, todayISO } from './format.js';
-import { $, toast } from './dom.js';
+import { $, h, toast } from './dom.js';
+import { icon } from './icons.js';
 
 const EMAIL_KEY = 'gastos.email';
 const HISTORY_MONTHS = 12;
@@ -37,12 +38,12 @@ function showStatus(offline, hasSnapshot) {
   let text = '';
   if (offline) {
     text = hasSnapshot
-      ? `📴 Sin conexión: ves lo guardado en este dispositivo.${pendingText}`
-      : `📴 Sin conexión: este mes no está guardado en este dispositivo.${pendingText}`;
+      ? `Sin conexión: ves lo guardado en este dispositivo.${pendingText}`
+      : `Sin conexión: este mes no está guardado en este dispositivo.${pendingText}`;
   } else if (pending) {
-    text = `⏳${pendingText}`;
+    text = pendingText.trim();
   }
-  $('#net-text').textContent = text;
+  $('#net-text').replaceChildren(...(text ? [icon(offline ? 'offline' : 'clock'), h('span', {}, text)] : []));
   $('#net-problems').replaceChildren(...syncProblems.map((p) => {
     const li = document.createElement('li');
     li.textContent = p;
@@ -75,7 +76,7 @@ async function fetchMonth(ym) {
 async function reload() {
   const seq = ++loadSeq;
   const ym = month; // el usuario puede cambiar de mes mientras esto espera la red
-  $('#month-label').textContent = monthLabel(ym);
+  showMonth(ym);
   await syncPending(); // primero lo pendiente, así lo que se lee ya lo incluye
   let data;
   let offline = false;
@@ -105,16 +106,27 @@ async function reload() {
   showStatus(offline, hasSnapshot);
 }
 
-function changeMonth(delta) {
-  month = addMonths(month, delta);
+// El nombre del mes se lee en voz alta al cambiar: solo se toca si cambió.
+function showMonth(ym) {
+  const label = monthLabel(ym);
+  if ($('#month-label').textContent !== label) $('#month-label').textContent = label;
+  $('#month-today').hidden = ym === todayISO().slice(0, 7);
+}
+
+function goToMonth(ym) {
+  month = ym;
   showExpenses(null);
   showSummary(null);
   reload();
 }
 
+const changeMonth = (delta) => goToMonth(addMonths(month, delta));
+
 // ---------- Menú: Inicio (gastos), Resumen y Ajustes ----------
 
 const TABS = ['gastos', 'resumen', 'categorias', 'ajustes'];
+const TAB_TITLES = { gastos: 'Inicio', resumen: 'Resumen', categorias: 'Categorías', ajustes: 'Ajustes' };
+const wideLayout = matchMedia('(min-width: 64rem)'); // en PC, Resumen va junto a Inicio
 
 function syncTab() {
   if (location.hash === '#nuevo') { // atajo del ícono instalado: "Agregar gasto"
@@ -123,8 +135,10 @@ function syncTab() {
   }
   const tab = TABS.find((t) => location.hash === `#${t}`) ?? 'gastos';
   $('#app').dataset.tab = tab;
+  document.title = `${TAB_TITLES[tab]} · Mis Gastos`;
+  const current = tab === 'resumen' && wideLayout.matches ? 'gastos' : tab;
   for (const link of document.querySelectorAll('.nav a')) {
-    if (link.dataset.tab === tab) link.setAttribute('aria-current', 'page');
+    if (link.dataset.tab === current) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   }
   if (tab === 'gastos' || tab === 'resumen') resizeCharts(); // los gráficos pudieron dibujarse ocultos (tamaño 0)
@@ -248,6 +262,8 @@ function wireUi() {
 
   $('#month-prev').addEventListener('click', () => changeMonth(-1));
   $('#month-next').addEventListener('click', () => changeMonth(1));
+  $('#month-today').addEventListener('click', () => goToMonth(todayISO().slice(0, 7)));
+  wideLayout.addEventListener('change', syncTab);
   window.addEventListener('hashchange', syncTab);
   // Sincronización entre dispositivos: recargar al volver a la app o al recuperar internet.
   document.addEventListener('visibilitychange', () => {

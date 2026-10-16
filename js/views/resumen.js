@@ -3,6 +3,7 @@ import { budgetReport, dailyTotals, elapsedDays, fillMonths, monthSummary, total
 import { addMonths, formatCLP, todayISO } from '../format.js';
 import { $, h } from '../dom.js';
 import { budgetBadge, budgetBar, budgetDetail } from './budget.js';
+import { icon } from '../icons.js';
 
 const CHART_URL = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/auto/+esm';
 const FALLBACK_COLOR = '#64748b';
@@ -49,8 +50,7 @@ function renderKpis(summary, count, month) {
     note.textContent = '';
     return;
   }
-  const arrow = diff > 0 ? '▲ ' : diff < 0 ? '▼ ' : '';
-  diffEl.replaceChildren(h('span', { 'aria-hidden': 'true' }, arrow), formatCLP(Math.abs(diff)));
+  diffEl.replaceChildren(...(diff ? [icon(diff > 0 ? 'arrowUp' : 'arrowDown')] : []), formatCLP(Math.abs(diff)));
   diffEl.dataset.trend = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat';
   if (pct === null) note.textContent = `No hubo gastos ${partial ? period : `en ${period}`} para comparar.`;
   else if (diff === 0) note.textContent = `Igual que ${period}.`;
@@ -156,7 +156,7 @@ function dailyConfig({ month, expenses }, colors) {
         pointRadius: 0,
         pointHoverRadius: 5,
         pointHitRadius: 14,
-        tension: 0.25,
+        cubicInterpolationMode: 'monotone', // suave sin pasar bajo $0 junto a un día alto
       }],
     },
     options: baseOptions(colors, (items) => dayMonth.format(toDate(dayIso(items[0].dataIndex)))),
@@ -207,6 +207,7 @@ async function renderCharts(data) {
   if (seq !== renderSeq) return; // llegaron datos más nuevos mientras se cargaba Chart.js
   for (const box of document.querySelectorAll('#view-resumen .chart-box')) delete box.dataset.error;
   Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) Chart.defaults.animation = false;
   const colors = themeColors();
   replaceChart('daily', $('#chart-daily'), dailyConfig(data, colors), Chart);
   replaceChart('months', $('#chart-months'), monthsConfig(data, colors), Chart);

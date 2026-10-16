@@ -16,17 +16,21 @@ export function h(tag, props = {}, ...children) {
 
 export const $ = (sel) => document.querySelector(sel);
 
+const TOAST_MIN_MS = 3500;
+const TOAST_MS_PER_CHAR = 70; // los mensajes largos (errores) quedan más tiempo para leerlos
+
 let toastTimer;
 export function toast(message) {
   const el = $('#toast');
   el.textContent = message;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.textContent = ''; }, 3500);
+  toastTimer = setTimeout(() => { el.textContent = ''; }, Math.max(TOAST_MIN_MS, message.length * TOAST_MS_PER_CHAR));
 }
 
 // Deshabilita el botón mientras corre action; si falla, muestra el error en errorEl
 // (el formulario sigue abierto y no se pierde lo escrito).
 export async function withBusy(button, errorEl, action, describeError) {
+  const hadFocus = document.activeElement === button; // deshabilitar un botón le quita el foco
   button.disabled = true;
   try {
     await action();
@@ -34,6 +38,7 @@ export async function withBusy(button, errorEl, action, describeError) {
     errorEl.textContent = describeError(err);
   } finally {
     button.disabled = false;
+    if (hadFocus && button.isConnected && !button.hidden && document.activeElement === document.body) button.focus();
   }
 }
 

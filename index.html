@@ -13,10 +13,10 @@
   <link rel="icon" href="./icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
   <!-- Subir ?v= en cada publicación para que el navegador no mezcle versiones en caché. -->
-  <link rel="stylesheet" href="./css/styles.css?v=10">
+  <link rel="stylesheet" href="./css/styles.css?v=11">
   <!-- config.js es local (gitignored). Si no existe (GitHub Pages), la app pide la clave. -->
   <script src="./config.js"></script>
-  <script type="module" src="./js/app.js?v=10"></script>
+  <script type="module" src="./js/app.js?v=11"></script>
 </head>
 <body>
   <div id="boot" class="boot" aria-live="polite">
@@ -27,7 +27,7 @@
       <button id="boot-retry" type="button" class="primary">Reintentar</button>
     </div>
   </div>
-  <script src="./js/boot.js?v=10"></script>
+  <script src="./js/boot.js?v=11"></script>
 
   <!-- Configuración inicial (una vez por dispositivo) -->
   <main id="setup" class="auth" hidden>
@@ -71,11 +71,13 @@
           <span>Mis Gastos</span>
         </div>
         <div class="month-nav">
-          <button id="month-prev" type="button" class="icon" aria-label="Mes anterior">‹</button>
+          <button id="month-prev" type="button" class="icon-btn" aria-label="Mes anterior"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
           <h1 id="month-label" aria-live="polite"></h1>
-          <button id="month-next" type="button" class="icon" aria-label="Mes siguiente">›</button>
+          <button id="month-next" type="button" class="icon-btn" aria-label="Mes siguiente"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
         </div>
-        <h1 class="page-title">Ajustes</h1>
+        <div class="topbar-end">
+          <button id="month-today" type="button" class="pill" hidden>Hoy</button>
+        </div>
       </div>
     </header>
 
@@ -102,7 +104,7 @@
           <input id="filter-q" type="search" placeholder="Buscar en notas" autocomplete="off">
         </div>
 
-        <div id="expense-list" aria-live="polite"></div>
+        <div id="expense-list"></div>
       </section>
 
       <section id="view-resumen" aria-label="Resumen">
@@ -125,56 +127,58 @@
         </div>
 
         <section class="card" aria-labelledby="budget-title">
-          <h3 id="budget-title">Presupuestos</h3>
+          <h2 id="budget-title">Presupuestos</h2>
           <ul id="budget-list" class="cat-bars"></ul>
         </section>
 
         <section class="card" aria-labelledby="cat-title">
-          <h3 id="cat-title">Por categoría</h3>
+          <h2 id="cat-title">Por categoría</h2>
           <ul id="cat-bars" class="cat-bars"></ul>
         </section>
 
         <section class="card" aria-labelledby="daily-title">
-          <h3 id="daily-title">Gasto diario</h3>
+          <h2 id="daily-title">Gasto diario</h2>
           <div class="chart-box"><canvas id="chart-daily" role="img"></canvas></div>
         </section>
 
         <section class="card" aria-labelledby="months-title">
-          <h3 id="months-title">Últimos 12 meses</h3>
+          <h2 id="months-title">Últimos 12 meses</h2>
           <div class="chart-box"><canvas id="chart-months" role="img"></canvas></div>
         </section>
       </section>
-      <section id="view-categorias" aria-label="Categorías">
+      <section id="view-categorias" aria-labelledby="categorias-title">
+        <h2 id="categorias-title" class="sr-only">Categorías</h2>
         <div class="section-head">
           <p class="muted">Toca una categoría para editarla o ponerle un presupuesto mensual.</p>
-          <button id="cat-add" type="button" class="primary">+ Nueva</button>
+          <button id="cat-add" type="button" class="primary with-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Nueva</button>
         </div>
         <ul id="cat-list" class="cat-list"></ul>
       </section>
 
-      <section id="view-ajustes" aria-label="Ajustes">
+      <section id="view-ajustes" aria-labelledby="ajustes-title">
+        <h2 id="ajustes-title" class="sr-only">Ajustes</h2>
         <section class="card">
-          <h3>Cuenta</h3>
+          <h2>Cuenta</h2>
           <p class="setting-row"><span class="muted">Correo</span><strong id="account-email"></strong></p>
           <button id="logout" type="button" class="danger wide">Cerrar sesión</button>
         </section>
 
         <section class="card">
-          <h3>App en el celular</h3>
+          <h2>App en el celular</h2>
           <p id="install-text" class="muted">En Chrome: menú ⋮ → <strong>Instalar app</strong> o <strong>Agregar a pantalla principal</strong>.</p>
-          <button id="install" type="button" class="primary wide" hidden>📲 Instalar app</button>
+          <button id="install" type="button" class="primary wide with-icon" hidden><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18h2"/></svg>Instalar app</button>
         </section>
 
         <section class="card" aria-labelledby="csv-title">
-          <h3 id="csv-title">Respaldo (CSV)</h3>
+          <h2 id="csv-title">Respaldo (CSV)</h2>
           <p class="muted">Descarga todos tus gastos para guardarlos o abrirlos en Excel. Para importar, el archivo debe tener las columnas <strong>fecha</strong>, <strong>categoria</strong>, <strong>monto</strong> y, si quieres, <strong>nota</strong>.</p>
           <div class="btn-row">
-            <button id="csv-export" type="button" class="primary">⬇️ Exportar</button>
-            <button id="csv-import" type="button">⬆️ Importar</button>
+            <button id="csv-export" type="button" class="primary with-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>Exportar</button>
+            <button id="csv-import" type="button" class="with-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5"/><path d="M7 10l5-5 5 5"/><path d="M5 20h14"/></svg>Importar</button>
           </div>
           <input id="csv-file" type="file" accept=".csv,text/csv" hidden>
           <p id="csv-error" class="error" role="alert"></p>
-          <div id="csv-preview" class="csv-preview" role="status" hidden>
+          <div id="csv-preview" class="csv-preview" role="status" tabindex="-1" hidden>
             <div id="csv-summary"></div>
             <ul id="csv-errors"></ul>
             <div class="actions">
@@ -185,7 +189,7 @@
         </section>
 
         <section class="card">
-          <h3>Privacidad</h3>
+          <h2>Privacidad</h2>
           <p class="muted">Tus datos están en tu base de Supabase y solo se pueden leer con tu sesión. Para entrar se necesita acceso a tu correo.</p>
           <button id="reset-config" type="button" class="wide">Cambiar clave de Supabase</button>
         </section>
@@ -211,13 +215,13 @@
       </a>
     </nav>
 
-    <button id="add" type="button" class="fab" aria-label="Agregar gasto">+</button>
+    <button id="add" type="button" class="fab" aria-label="Agregar gasto"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
   </div>
 
   <dialog id="expense-dialog" aria-labelledby="form-title">
     <form id="expense-form" class="stack" novalidate>
       <h2 id="form-title">Nuevo gasto</h2>
-      <p id="f-locked" class="locked" hidden>🔒 Pasaron más de 12 horas: este gasto ya no se puede editar ni eliminar.</p>
+      <p id="f-locked" class="locked" hidden><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/></svg><span>Pasaron más de 12 horas: este gasto ya no se puede editar ni eliminar.</span></p>
       <fieldset id="f-fields" class="stack">
         <label for="f-amount">Monto</label>
         <div class="amount-wrap">
@@ -253,7 +257,7 @@
       <h2 id="c-title">Nueva categoría</h2>
       <label for="c-name">Nombre</label>
       <input id="c-name" maxlength="40" required autocomplete="off" placeholder="Ej: Mascotas">
-      <div class="row">
+      <div class="row compact">
         <div class="stack">
           <label for="c-icon">Emoji</label>
           <input id="c-icon" maxlength="16" autocomplete="off" placeholder="🙂" class="icon-input">

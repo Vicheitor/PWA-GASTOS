@@ -46,10 +46,10 @@ test('filterExpenses combina categoría y búsqueda', () => {
 test('validateExpense acepta un gasto correcto y rechaza cada campo inválido', () => {
   const ids = new Set(['comida']);
   const ok = { amount: 1000, category_id: 'comida', spent_on: '2026-10-16', note: null };
-  assert.equal(validateExpense(ok, ids), '');
-  assert.match(validateExpense({ ...ok, amount: 0 }, ids), /monto/);
-  assert.match(validateExpense({ ...ok, amount: NaN }, ids), /monto/);
-  assert.match(validateExpense({ ...ok, category_id: 'otra' }, ids), /categoría/);
-  assert.match(validateExpense({ ...ok, spent_on: '2026-02-30' }, ids), /fecha/);
-  assert.match(validateExpense({ ...ok, note: 'x'.repeat(201) }, ids), /200/);
+  assert.equal(validateExpense(ok, ids), null);
+  assert.match(validateExpense({ ...ok, amount: 0 }, ids).message, /monto/);
+  assert.match(validateExpense({ ...ok, amount: NaN }, ids).message, /monto/);
+  assert.match(validateExpense({ ...ok, category_id: 'otra' }, ids).message, /categoría/);
+  assert.match(validateExpense({ ...ok, spent_on: '2026-02-30' }, ids).message, /fecha/);
+  assert.match(validateExpense({ ...ok, note: 'x'.repeat(201) }, ids).message, /200/);
 });

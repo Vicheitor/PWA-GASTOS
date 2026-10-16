@@ -39,8 +39,10 @@ async function onExport() {
 // ---------- Importar ----------
 
 function hidePreview() {
+  const hadFocus = $('#csv-preview').contains(document.activeElement);
   pending = null;
   $('#csv-preview').hidden = true;
+  if (hadFocus) $('#csv-import').focus();
 }
 
 function showPreview({ toInsert, newCategories, errors, duplicates }) {
@@ -61,6 +63,7 @@ function showPreview({ toInsert, newCategories, errors, duplicates }) {
   $('#csv-confirm').hidden = !toInsert.length;
   $('#csv-confirm').textContent = `Importar ${toInsert.length}`;
   $('#csv-preview').hidden = false;
+  (toInsert.length ? $('#csv-confirm') : $('#csv-preview')).focus();
 }
 
 async function onFile(ev) {

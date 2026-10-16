@@ -4,7 +4,8 @@ import { submitChange } from '../offline.js';
 import { budgetReport, filterExpenses, groupByDay, isEditable, sumAmounts, validateExpense } from '../calc.js';
 import { dayLabel, formatCLP, formatThousands, parseAmount, todayISO } from '../format.js';
 import { $, bindAmountInput, h, toast, withBusy } from '../dom.js';
-import { budgetAlertText } from './budget.js';
+import { budgetAlert, budgetAlertText } from './budget.js';
+import { icon } from '../icons.js';
 
 const FALLBACK_COLOR = '#64748b';
 
@@ -64,7 +65,7 @@ function renderItem(expense, categories) {
       h('span', { class: 'item-cat' }, cat?.name ?? 'Sin categoría'),
       expense.note ? h('span', { class: 'item-note' }, expense.note) : null),
     h('span', { class: 'item-amount' },
-      expense.pending ? h('span', { class: 'pending', title: 'Pendiente de enviar' }, '⏳ ') : null,
+      expense.pending ? h('span', { class: 'pending' }, icon('clock')) : null,
       formatCLP(expense.amount),
       expense.pending ? h('span', { class: 'sr-only' }, ' (pendiente de enviar)') : null)));
 }
@@ -92,10 +93,13 @@ function render() {
   $('#total-label').textContent = filtering ? 'Total filtrado' : 'Total del mes';
   $('#month-total').textContent = formatCLP(sumAmounts(visible));
   $('#month-count').textContent = visible.length === 1 ? '1 gasto' : `${visible.length} gastos`;
+  // Solo se redibujan si cambiaron: es una región que se lee en voz alta.
   const alerts = budgetReport(state.categories, state.expenses).filter((r) => r.level !== 'ok');
-  $('#budget-alerts').replaceChildren(...alerts.map((r) =>
-    h('p', { class: `alert ${r.level}` }, budgetAlertText(r))));
-  $('#expense-list').setAttribute('aria-busy', String(state.loading));
+  const alertsKey = alerts.map(budgetAlertText).join('|');
+  if ($('#budget-alerts').dataset.key !== alertsKey) {
+    $('#budget-alerts').dataset.key = alertsKey;
+    $('#budget-alerts').replaceChildren(...alerts.map(budgetAlert));
+  }
   $('#expense-list').replaceChildren(...(days.length
     ? days.map((d) => renderDay(d, categories, today))
     : [h('p', { class: 'empty' }, emptyMessage(filtering))]));
@@ -152,15 +156,23 @@ async function onSubmit(ev) {
     note: form.note.value.trim() || null,
     created_at: editing?.created_at ?? new Date().toISOString(), // para mostrarlo mientras está pendiente
   };
-  const error = validateExpense(row, new Set(state.categories.map((c) => c.id)));
-  $('#f-error').textContent = error;
-  if (error) return;
+  const invalid = validateExpense(row, new Set(state.categories.map((c) => c.id)));
+  $('#f-error').textContent = invalid?.message ?? '';
+  if (invalid) {
+    const field = invalid.field === 'category'
+      ? form.querySelector('input[name="category"]:checked') ?? form.querySelector('input[name="category"]')
+      : form[invalid.field];
+    field?.focus();
+    return;
+  }
   await withBusy($('#f-save'), $('#f-error'), async () => {
     const pending = await submitChange({ type: 'save', row, isNew: !editing });
+    navigator.vibrate?.(12); // confirmación táctil breve en Android
     $('#expense-dialog').close();
     if (pending) toast('Guardado sin conexión: se enviará al volver internet.');
     else toast(editing ? 'Gasto actualizado' : 'Gasto guardado');
     await onChange();
+    $('#add').focus(); // el gasto que abrió el formulario se redibujó: el foco vuelve al botón +
   }, errorMessage);
 }
 
@@ -172,6 +184,7 @@ async function onDelete() {
     $('#expense-dialog').close();
     toast(pending ? 'Eliminado sin conexión: se enviará al volver internet.' : 'Gasto eliminado');
     await onChange();
+    $('#add').focus();
   }, errorMessage);
 }
 
@@ -189,6 +202,13 @@ export function mountExpenses({ categories, onDataChange }) {
   $('#f-cancel').addEventListener('click', () => $('#expense-dialog').close());
   $('#f-delete').addEventListener('click', onDelete);
   bindAmountInput($('#f-amount'));
+  // Enter en el monto ("siguiente" en el teclado del celular) pasa a elegir la categoría.
+  $('#f-amount').addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter') return;
+    ev.preventDefault();
+    const form = $('#expense-form');
+    (form.querySelector('input[name="category"]:checked') ?? form.querySelector('input[name="category"]'))?.focus();
+  });
   $('#expense-form').addEventListener('submit', onSubmit);
   render();
 }
