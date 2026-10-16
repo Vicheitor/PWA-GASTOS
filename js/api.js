@@ -30,6 +30,9 @@ export function errorMessage(err) {
   if (!navigator.onLine || /failed to fetch|network/i.test(err?.message ?? '')) {
     return 'Sin conexión. Intenta de nuevo.';
   }
+  if (err?.code === 'over_email_send_rate_limit' || err?.status === 429 || /rate limit/i.test(err?.message ?? '')) {
+    return 'Se enviaron demasiados correos. Usa el último enlace que te llegó o espera cerca de una hora.';
+  }
   if (err?.code === '42501' || err?.code === 'LOCKED') {
     return 'Este gasto tiene más de 12 horas y ya no se puede modificar.';
   }
