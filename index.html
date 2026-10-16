@@ -11,10 +11,10 @@
   <link rel="icon" href="./icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
   <!-- Subir ?v= en cada publicación para que el navegador no mezcle versiones en caché. -->
-  <link rel="stylesheet" href="./css/styles.css?v=7">
+  <link rel="stylesheet" href="./css/styles.css?v=8">
   <!-- config.js es local (gitignored). Si no existe (GitHub Pages), la app pide la clave. -->
   <script src="./config.js"></script>
-  <script type="module" src="./js/app.js?v=7"></script>
+  <script type="module" src="./js/app.js?v=8"></script>
 </head>
 <body>
   <div id="boot" class="boot" aria-live="polite">
@@ -164,6 +164,25 @@
           <h3>App en el celular</h3>
           <p id="install-text" class="muted">En Chrome: menú ⋮ → <strong>Instalar app</strong> o <strong>Agregar a pantalla principal</strong>.</p>
           <button id="install" type="button" class="primary wide" hidden>📲 Instalar app</button>
+        </section>
+
+        <section class="card" aria-labelledby="csv-title">
+          <h3 id="csv-title">Respaldo (CSV)</h3>
+          <p class="muted">Descarga todos tus gastos para guardarlos o abrirlos en Excel. Para importar, el archivo debe tener las columnas <strong>fecha</strong>, <strong>categoria</strong>, <strong>monto</strong> y, si quieres, <strong>nota</strong>.</p>
+          <div class="btn-row">
+            <button id="csv-export" type="button" class="primary">⬇️ Exportar</button>
+            <button id="csv-import" type="button">⬆️ Importar</button>
+          </div>
+          <input id="csv-file" type="file" accept=".csv,text/csv" hidden>
+          <p id="csv-error" class="error" role="alert"></p>
+          <div id="csv-preview" class="csv-preview" role="status" hidden>
+            <div id="csv-summary"></div>
+            <ul id="csv-errors"></ul>
+            <div class="actions">
+              <button id="csv-cancel" type="button">Cancelar</button>
+              <button id="csv-confirm" type="button" class="primary">Importar</button>
+            </div>
+          </div>
         </section>
 
         <section class="card">

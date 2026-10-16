@@ -457,3 +457,10 @@ input[type="color"] { padding: .3rem; cursor: pointer; }
 .alert.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); }
 .alert.over { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--surface)); }
 .cat-card .item-note { white-space: normal; }
+
+/* ---------- Respaldo CSV ---------- */
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.csv-preview { margin-top: .75rem; padding: .8rem 1rem; border-radius: var(--radius-sm); background: var(--surface-2); }
+.csv-preview p { margin: 0 0 .35rem; }
+#csv-errors { margin: .25rem 0 0; padding-left: 1.2rem; color: var(--danger); font-size: .9rem; }
+#csv-errors:empty { display: none; }

@@ -6,6 +6,7 @@ import {
 } from './api.js';
 import { mountExpenses, openNewExpense, setCategories, showExpenses } from './views/gastos.js';
 import { mountCategories, showCategories } from './views/categorias.js';
+import { mountBackup } from './views/respaldo.js';
 import { resizeCharts, showSummary } from './views/resumen.js';
 import { addMonths, monthLabel, monthRange, todayISO } from './format.js';
 import { $, toast } from './dom.js';
@@ -111,6 +112,7 @@ async function handleSession(session) {
     show('app');
     mountExpenses({ categories, onDataChange: reload });
     mountCategories({ onDataChange: reload });
+    mountBackup({ onDataChange: reload });
     syncTab();
     await reload();
   } catch (err) {

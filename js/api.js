@@ -82,6 +82,11 @@ export async function saveCategory({ id, name, icon, color, monthly_budget }) {
   else check(await sb.from('categories').insert(row));
 }
 
+// Varias a la vez (importación CSV). Devuelve las creadas con su id.
+export async function createCategories(rows) {
+  return check(await sb.from('categories').insert(rows).select('id,name,icon,color,monthly_budget'));
+}
+
 // Mueve sus gastos a moveTo (si tiene) y la elimina, todo en la base (ver delete_category en schema.sql).
 export async function deleteCategory(id, moveTo) {
   check(await sb.rpc('delete_category', { p_category: id, p_move_to: moveTo || null }));
@@ -115,6 +120,13 @@ export async function listMonthlyTotals(fromDate, toDate) {
 // Si el gasto tiene más de 12 h, RLS rechaza la actualización con 42501.
 export async function saveExpense({ id, category_id, amount, spent_on, note }) {
   check(await sb.from('expenses').upsert({ id, category_id, amount, spent_on, note }));
+}
+
+// Importación CSV: inserta en tandas para no mandar peticiones gigantes.
+export async function insertExpenses(rows) {
+  for (let i = 0; i < rows.length; i += PAGE_SIZE) {
+    check(await sb.from('expenses').insert(rows.slice(i, i + PAGE_SIZE)));
+  }
 }
 
 // RLS no da error al borrar un gasto bloqueado: simplemente no borra nada. Por eso se verifica.
