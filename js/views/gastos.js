@@ -1,5 +1,6 @@
 // Vista de gastos: lista del mes agrupada por día, filtros y formulario de alta/edición.
-import { deleteExpense, errorMessage, saveExpense } from '../api.js';
+import { errorMessage } from '../api.js';
+import { submitChange } from '../offline.js';
 import { budgetReport, filterExpenses, groupByDay, isEditable, sumAmounts, validateExpense } from '../calc.js';
 import { dayLabel, formatCLP, formatThousands, parseAmount, todayISO } from '../format.js';
 import { $, bindAmountInput, h, toast, withBusy } from '../dom.js';
@@ -55,7 +56,10 @@ function renderItem(expense, categories) {
     h('span', { class: 'item-main' },
       h('span', { class: 'item-cat' }, cat?.name ?? 'Sin categoría'),
       expense.note ? h('span', { class: 'item-note' }, expense.note) : null),
-    h('span', { class: 'item-amount' }, formatCLP(expense.amount))));
+    h('span', { class: 'item-amount' },
+      expense.pending ? h('span', { class: 'pending', title: 'Pendiente de enviar' }, '⏳ ') : null,
+      formatCLP(expense.amount),
+      expense.pending ? h('span', { class: 'sr-only' }, ' (pendiente de enviar)') : null)));
 }
 
 function renderDay(day, categories, today) {
@@ -138,14 +142,16 @@ async function onSubmit(ev) {
     category_id: form.querySelector('input[name="category"]:checked')?.value ?? '',
     spent_on: form.spent_on.value,
     note: form.note.value.trim() || null,
+    created_at: editing?.created_at ?? new Date().toISOString(), // para mostrarlo mientras está pendiente
   };
   const error = validateExpense(row, new Set(state.categories.map((c) => c.id)));
   $('#f-error').textContent = error;
   if (error) return;
   await withBusy($('#f-save'), $('#f-error'), async () => {
-    await saveExpense(row);
+    const pending = await submitChange({ type: 'save', row, isNew: !editing });
     $('#expense-dialog').close();
-    toast(editing ? 'Gasto actualizado' : 'Gasto guardado');
+    if (pending) toast('Guardado sin conexión: se enviará al volver internet.');
+    else toast(editing ? 'Gasto actualizado' : 'Gasto guardado');
     await onChange();
   }, errorMessage);
 }
@@ -154,9 +160,9 @@ async function onDelete() {
   if (!editing || !confirm('¿Eliminar este gasto?')) return;
   const { id } = editing;
   await withBusy($('#f-delete'), $('#f-error'), async () => {
-    await deleteExpense(id);
+    const pending = await submitChange({ type: 'delete', id });
     $('#expense-dialog').close();
-    toast('Gasto eliminado');
+    toast(pending ? 'Eliminado sin conexión: se enviará al volver internet.' : 'Gasto eliminado');
     await onChange();
   }, errorMessage);
 }

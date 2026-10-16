@@ -26,10 +26,13 @@ function check({ data, error }) {
   return data;
 }
 
+// Error por falta de conexión (no llegó a Supabase), a diferencia de un rechazo del servidor.
+export function isNetworkError(err) {
+  return !navigator.onLine || /failed to fetch|networkerror|network request failed|load failed|fetch failed/i.test(err?.message ?? '');
+}
+
 export function errorMessage(err) {
-  if (!navigator.onLine || /failed to fetch|network/i.test(err?.message ?? '')) {
-    return 'Sin conexión. Intenta de nuevo.';
-  }
+  if (isNetworkError(err)) return 'Sin conexión. Intenta de nuevo.';
   if (err?.code === 'over_email_send_rate_limit' || err?.status === 429 || /rate limit/i.test(err?.message ?? '')) {
     return 'Se enviaron demasiados correos. Usa el último enlace que te llegó o espera cerca de una hora.';
   }
@@ -51,6 +54,17 @@ export async function sendMagicLink(email) {
     email,
     options: { emailRedirectTo: location.href.split('#')[0] },
   }));
+}
+
+// Usuario de la sesión guardada por supabase-js. Sin conexión, el token vencido no se puede
+// renovar y supabase-js informa "sin sesión"; con esto la app igual abre con los datos locales.
+export function storedUser() {
+  try {
+    const key = Object.keys(localStorage).find((k) => /^sb-.+-auth-token$/.test(k));
+    return key ? JSON.parse(localStorage.getItem(key))?.user ?? null : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function signOut() {

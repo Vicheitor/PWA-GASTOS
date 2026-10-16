@@ -464,3 +464,20 @@ input[type="color"] { padding: .3rem; cursor: pointer; }
 .csv-preview p { margin: 0 0 .35rem; }
 #csv-errors { margin: .25rem 0 0; padding-left: 1.2rem; color: var(--danger); font-size: .9rem; }
 #csv-errors:empty { display: none; }
+
+/* ---------- Sin conexión / pendientes ---------- */
+.net-status {
+  max-width: var(--content);
+  margin: .75rem auto 0;
+  padding: .7rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-weight: 600; font-size: .92rem;
+  width: calc(100% - 2rem);
+}
+.net-status p { margin: 0; }
+.net-status p:empty { display: none; }
+#net-problems { margin: .35rem 0 0; padding-left: 1.2rem; color: var(--danger); }
+#net-problems:empty { display: none; }
+.pending { font-size: .85em; }

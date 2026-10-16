@@ -1,14 +1,15 @@
 // Arranque: configuración → sesión → app. También maneja el mes elegido, la carga de datos y las pestañas.
 import { clearConfig, configError, readConfig, showSetup } from './setup.js';
 import {
-  ensureCategories, errorMessage, initClient, listCategories, listExpenses, listMonthlyTotals, onAuthChange,
-  sendMagicLink, signOut,
+  ensureCategories, errorMessage, initClient, isNetworkError, listCategories, listExpenses, listMonthlyTotals,
+  onAuthChange, sendMagicLink, signOut, storedUser,
 } from './api.js';
+import { initOffline, loadSnapshot, pendingOps, saveSnapshot, syncPending, withPending } from './offline.js';
 import { mountExpenses, openNewExpense, setCategories, showExpenses } from './views/gastos.js';
 import { mountCategories, showCategories } from './views/categorias.js';
 import { mountBackup } from './views/respaldo.js';
 import { resizeCharts, showSummary } from './views/resumen.js';
-import { addMonths, monthLabel, monthRange, todayISO } from './format.js';
+import { addMonths, formatCLP, monthLabel, monthRange, todayISO } from './format.js';
 import { $, toast } from './dom.js';
 
 const EMAIL_KEY = 'gastos.email';
@@ -19,35 +20,86 @@ let categories = [];
 let month = todayISO().slice(0, 7);
 let loadSeq = 0;
 let installPrompt = null; // evento de Chrome para ofrecer "Instalar app"
+let syncProblems = []; // cambios que Supabase rechazó al sincronizar (se muestran hasta cerrarlos)
 
 function show(screen) {
   for (const id of ['boot', 'setup', 'login', 'app']) $(`#${id}`).hidden = id !== screen;
 }
 
-// ---------- Datos del mes (compartidos por Gastos y Resumen) ----------
+// ---------- Aviso de conexión y sincronización ----------
+
+function showStatus(offline, hasSnapshot) {
+  const pending = pendingOps().length;
+  const pendingText = pending ? ` ${pending} ${pending === 1 ? 'cambio' : 'cambios'} por enviar.` : '';
+  let text = '';
+  if (offline) {
+    text = hasSnapshot
+      ? `📴 Sin conexión: ves lo guardado en este dispositivo.${pendingText}`
+      : `📴 Sin conexión: este mes no está guardado en este dispositivo.${pendingText}`;
+  } else if (pending) {
+    text = `⏳${pendingText}`;
+  }
+  $('#net-text').textContent = text;
+  $('#net-problems').replaceChildren(...syncProblems.map((p) => {
+    const li = document.createElement('li');
+    li.textContent = p;
+    return li;
+  }));
+  $('#net-dismiss').hidden = !syncProblems.length;
+  $('#net-status').hidden = !text && !syncProblems.length;
+}
+
+function reportSyncFailures(failed) {
+  syncProblems = [...syncProblems, ...failed.map(({ op, err }) => (op.type === 'save'
+    ? `No se pudo guardar ${formatCLP(op.row.amount)} del ${op.row.spent_on}: ${errorMessage(err)}`
+    : `No se pudo eliminar un gasto: ${errorMessage(err)}`))];
+  showStatus(!navigator.onLine, true);
+}
+
+// ---------- Datos del mes (compartidos por todas las vistas) ----------
+
+async function fetchMonth() {
+  // Las categorías también se recargan: pueden cambiar en otra vista o en otro dispositivo.
+  const [freshCategories, expenses, previous, monthly] = await Promise.all([
+    listCategories(),
+    listExpenses(...monthRange(month)),
+    listExpenses(...monthRange(addMonths(month, -1))),
+    listMonthlyTotals(`${addMonths(month, 1 - HISTORY_MONTHS)}-01`, monthRange(month)[1]),
+  ]);
+  return { categories: freshCategories, expenses, previous, monthly };
+}
 
 async function reload() {
   const seq = ++loadSeq;
   $('#month-label').textContent = monthLabel(month);
+  await syncPending(); // primero lo pendiente, así lo que se lee ya lo incluye
+  let data;
+  let offline = false;
+  let hasSnapshot = true;
   try {
-    // Las categorías también se recargan: pueden cambiar en esta vista o en otro dispositivo.
-    const [freshCategories, expenses, previous, monthly] = await Promise.all([
-      listCategories(),
-      listExpenses(...monthRange(month)),
-      listExpenses(...monthRange(addMonths(month, -1))),
-      listMonthlyTotals(`${addMonths(month, 1 - HISTORY_MONTHS)}-01`, monthRange(month)[1]),
-    ]);
-    if (seq !== loadSeq) return; // el usuario ya cambió de mes
-    categories = freshCategories;
-    setCategories(categories);
-    showExpenses(expenses);
-    showSummary({ month, expenses, previous, monthly, categories });
-    showCategories({ categories, expenses });
+    data = await fetchMonth();
+    saveSnapshot(month, data);
   } catch (err) {
     if (seq !== loadSeq) return;
-    showExpenses([]);
-    toast(errorMessage(err));
+    if (!isNetworkError(err)) {
+      showExpenses([]);
+      toast(errorMessage(err));
+      return;
+    }
+    const saved = loadSnapshot(month);
+    offline = true;
+    hasSnapshot = Boolean(saved.month);
+    data = { expenses: [], previous: [], monthly: [], ...saved.month, categories: saved.categories ?? categories };
   }
+  if (seq !== loadSeq) return; // el usuario ya cambió de mes
+  categories = data.categories;
+  const expenses = withPending(data.expenses, monthRange(month));
+  const previous = withPending(data.previous, monthRange(addMonths(month, -1)));
+  setCategories(categories);
+  showExpenses(expenses);
+  showSummary({ month, expenses, previous, monthly: data.monthly, categories });
+  showCategories({ categories, expenses });
+  showStatus(offline, hasSnapshot);
 }
 
 function changeMonth(delta) {
@@ -98,17 +150,37 @@ function wireInstall() {
 
 // ---------- Sesión ----------
 
+// Categorías al iniciar; sin conexión, las guardadas en el dispositivo (null si no hay).
+async function startupCategories(userId) {
+  try {
+    return await ensureCategories(userId);
+  } catch (err) {
+    if (isNetworkError(err)) return loadSnapshot(month).categories;
+    throw err;
+  }
+}
+
 async function handleSession(session) {
-  if (!session) {
+  // Sin conexión supabase-js no puede renovar un token vencido y avisa "sin sesión":
+  // si hay una sesión guardada en el dispositivo, se abre igual con los datos locales.
+  const user = session?.user ?? (navigator.onLine ? null : storedUser());
+  if (!user) {
     currentUserId = null;
     show('login');
     return;
   }
-  if (session.user.id === currentUserId) return; // p. ej. TOKEN_REFRESHED
-  currentUserId = session.user.id;
+  if (user.id === currentUserId) return; // p. ej. TOKEN_REFRESHED
+  currentUserId = user.id;
+  initOffline(user.id, { onSyncFailures: reportSyncFailures });
   try {
-    categories = await ensureCategories(currentUserId);
-    $('#account-email').textContent = session.user.email ?? '';
+    categories = await startupCategories(user.id);
+    if (!categories) {
+      currentUserId = null;
+      show('login');
+      $('#login-msg').textContent = 'Sin conexión. Abre la app con internet una vez para guardar tus datos en este dispositivo.';
+      return;
+    }
+    $('#account-email').textContent = user.email ?? '';
     show('app');
     mountExpenses({ categories, onDataChange: reload });
     mountCategories({ onDataChange: reload });
@@ -167,9 +239,15 @@ function wireUi() {
   $('#month-prev').addEventListener('click', () => changeMonth(-1));
   $('#month-next').addEventListener('click', () => changeMonth(1));
   window.addEventListener('hashchange', syncTab);
-  // Sincronización entre dispositivos: recargar al volver a la app.
+  // Sincronización entre dispositivos: recargar al volver a la app o al recuperar internet.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && currentUserId) reload();
+  });
+  window.addEventListener('online', () => { if (currentUserId) reload(); });
+  window.addEventListener('offline', () => { if (currentUserId) showStatus(true, true); });
+  $('#net-dismiss').addEventListener('click', () => {
+    syncProblems = [];
+    showStatus(!navigator.onLine, true);
   });
 }
 
