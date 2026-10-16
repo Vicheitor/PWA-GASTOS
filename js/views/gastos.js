@@ -167,6 +167,8 @@ function onAmountInput(ev) {
   ev.target.value = digits ? formatThousands(Number(digits)) : '';
 }
 
+export const openNewExpense = () => openForm();
+
 // ---------- Montaje (una vez por carga de página) ----------
 
 export function mountExpenses({ categories, onDataChange }) {

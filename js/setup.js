@@ -1,7 +1,6 @@
 // Configuración de Supabase: desde config.js (local) o guardada en este dispositivo.
 
 const CONFIG_KEY = 'gastos.config';
-const DEFAULT_URL = 'https://ejemplo.supabase.co';
 
 function jwtRole(key) {
   try {
@@ -40,10 +39,10 @@ export function readConfig() {
   }
 }
 
-export function showSetup(cfg) {
+// Sin valores precargados: quien abra el sitio en un dispositivo nuevo no ve tu proyecto.
+export function showSetup() {
   const form = document.querySelector('#setup-form');
   const errorEl = document.querySelector('#setup-error');
-  form.url.value = cfg?.supabaseUrl ?? DEFAULT_URL;
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
     const next = {
@@ -60,4 +59,9 @@ export function showSetup(cfg) {
     }
     location.reload();
   });
+}
+
+// Olvida la configuración guardada en este dispositivo (vuelve a la pantalla de conexión).
+export function clearConfig() {
+  try { localStorage.removeItem(CONFIG_KEY); } catch { /* nada que borrar */ }
 }

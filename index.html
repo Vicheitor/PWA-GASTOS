@@ -3,57 +3,72 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1d4ed8">
-  <title>Gastos</title>
+  <meta name="theme-color" content="#f3f4f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0c0e13" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="Registra y analiza tus gastos mensuales.">
+  <title>Mis Gastos</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
   <link rel="stylesheet" href="./css/styles.css">
   <!-- config.js es local (gitignored). Si no existe (GitHub Pages), la app pide la clave. -->
   <script src="./config.js"></script>
   <script type="module" src="./js/app.js"></script>
 </head>
 <body>
-  <p id="boot" class="center muted">Cargando…</p>
+  <div id="boot" class="boot" aria-live="polite">
+    <img src="./icons/icon-192.png" alt="" width="64" height="64">
+    <span class="sr-only">Cargando…</span>
+  </div>
 
-  <!-- Configuración inicial -->
-  <main id="setup" class="screen" hidden>
-    <h1>Configurar Supabase</h1>
-    <p class="muted">Se guarda solo en este dispositivo.</p>
-    <form id="setup-form" class="stack" novalidate>
-      <label for="setup-url">URL del API</label>
-      <input id="setup-url" name="url" type="url" required autocomplete="off">
-      <label for="setup-key">Anon key (publishable)</label>
-      <textarea id="setup-key" name="key" rows="4" required autocomplete="off" spellcheck="false"></textarea>
-      <p id="setup-error" class="error" role="alert"></p>
-      <button class="primary" type="submit">Guardar</button>
-    </form>
+  <!-- Configuración inicial (una vez por dispositivo) -->
+  <main id="setup" class="auth" hidden>
+    <div class="auth-card">
+      <img src="./icons/icon-192.png" alt="" class="auth-logo" width="72" height="72">
+      <h1>Conectar la app</h1>
+      <p class="auth-tag">Solo la primera vez en este dispositivo.</p>
+      <form id="setup-form" class="stack" novalidate>
+        <label for="setup-url">URL del API</label>
+        <input id="setup-url" name="url" type="url" required autocomplete="off" placeholder="https://tu-proyecto.supabase.co">
+        <label for="setup-key">Anon key (publishable)</label>
+        <input id="setup-key" name="key" type="password" required autocomplete="off" spellcheck="false" placeholder="Pega aquí tu clave">
+        <p id="setup-error" class="error" role="alert"></p>
+        <button class="primary" type="submit">Conectar</button>
+      </form>
+    </div>
   </main>
 
-  <!-- Login -->
-  <main id="login" class="screen" hidden>
-    <h1>Gastos</h1>
-    <form id="login-form" class="stack" novalidate>
-      <label for="login-email">Correo</label>
-      <input id="login-email" name="email" type="email" required autocomplete="email" inputmode="email">
-      <p id="login-msg" role="status"></p>
-      <button class="primary" type="submit">Enviarme enlace de acceso</button>
-    </form>
+  <!-- Bienvenida / login -->
+  <main id="login" class="auth" hidden>
+    <div class="auth-card">
+      <img src="./icons/icon-192.png" alt="" class="auth-logo" width="72" height="72">
+      <h1>Mis Gastos</h1>
+      <p class="auth-tag">Anota en segundos. Entiende tu mes de un vistazo.</p>
+      <form id="login-form" class="stack" novalidate>
+        <label for="login-email">Tu correo</label>
+        <input id="login-email" name="email" type="email" required autocomplete="email" inputmode="email" placeholder="nombre@correo.com">
+        <button class="primary" type="submit">Entrar con mi correo</button>
+        <p id="login-msg" class="auth-msg" role="status"></p>
+      </form>
+      <p class="auth-foot">Sin contraseñas: te enviamos un enlace de acceso.</p>
+    </div>
   </main>
 
   <!-- App -->
   <div id="app" hidden>
     <header class="topbar">
       <div class="topbar-inner">
+        <div class="brand">
+          <img src="./icons/icon-192.png" alt="" width="30" height="30">
+          <span>Mis Gastos</span>
+        </div>
         <div class="month-nav">
           <button id="month-prev" type="button" class="icon" aria-label="Mes anterior">‹</button>
           <h1 id="month-label" aria-live="polite"></h1>
           <button id="month-next" type="button" class="icon" aria-label="Mes siguiente">›</button>
         </div>
-        <button id="logout" type="button" class="link">Salir</button>
+        <h1 class="page-title">Ajustes</h1>
       </div>
-      <!-- Pestañas solo en pantallas angostas; en PC ambas vistas van lado a lado. -->
-      <nav class="tabs" aria-label="Secciones">
-        <a href="#gastos" data-tab="gastos">Gastos</a>
-        <a href="#resumen" data-tab="resumen">Resumen</a>
-      </nav>
     </header>
 
     <main class="screen layout">
@@ -108,7 +123,41 @@
           <div class="chart-box"><canvas id="chart-months" role="img"></canvas></div>
         </section>
       </section>
+      <section id="view-ajustes" aria-label="Ajustes">
+        <section class="card">
+          <h3>Cuenta</h3>
+          <p class="setting-row"><span class="muted">Correo</span><strong id="account-email"></strong></p>
+          <button id="logout" type="button" class="danger wide">Cerrar sesión</button>
+        </section>
+
+        <section class="card">
+          <h3>App en el celular</h3>
+          <p id="install-text" class="muted">En Chrome: menú ⋮ → <strong>Instalar app</strong> o <strong>Agregar a pantalla principal</strong>.</p>
+          <button id="install" type="button" class="primary wide" hidden>📲 Instalar app</button>
+        </section>
+
+        <section class="card">
+          <h3>Privacidad</h3>
+          <p class="muted">Tus datos están en tu base de Supabase y solo se pueden leer con tu sesión. Para entrar se necesita acceso a tu correo.</p>
+          <button id="reset-config" type="button" class="wide">Cambiar clave de Supabase</button>
+        </section>
+      </section>
     </main>
+
+    <nav class="nav" aria-label="Menú principal">
+      <a href="#gastos" data-tab="gastos">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>
+        <span>Inicio</span>
+      </a>
+      <a href="#resumen" data-tab="resumen" class="nav-resumen">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11"/><path d="M10 20V4"/><path d="M16 20v-8"/><path d="M22 20H2"/></svg>
+        <span>Resumen</span>
+      </a>
+      <a href="#ajustes" data-tab="ajustes">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9"/><path d="M17 6h3"/><circle cx="15" cy="6" r="2"/><path d="M4 12h3"/><path d="M11 12h9"/><circle cx="9" cy="12" r="2"/><path d="M4 18h11"/><path d="M19 18h1"/><circle cx="17" cy="18" r="2"/></svg>
+        <span>Ajustes</span>
+      </a>
+    </nav>
 
     <button id="add" type="button" class="fab" aria-label="Agregar gasto">+</button>
   </div>

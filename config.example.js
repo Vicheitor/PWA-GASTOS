@@ -9,6 +9,6 @@
 // La anon key (o "publishable key") está en Supabase > Project Settings > API Keys.
 // NUNCA uses la service_role key (o "secret key"): la app la rechaza.
 window.APP_CONFIG = {
-  supabaseUrl: 'https://ejemplo.supabase.co',
+  supabaseUrl: 'https://TU-PROYECTO.supabase.co',
   supabaseAnonKey: 'TU_ANON_KEY',
 };

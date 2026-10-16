@@ -1,9 +1,9 @@
 // Arranque: configuración → sesión → app. También maneja el mes elegido, la carga de datos y las pestañas.
-import { configError, readConfig, showSetup } from './setup.js';
+import { clearConfig, configError, readConfig, showSetup } from './setup.js';
 import {
   ensureCategories, errorMessage, initClient, listExpenses, listMonthlyTotals, onAuthChange, sendMagicLink, signOut,
 } from './api.js';
-import { mountExpenses, showExpenses } from './views/gastos.js';
+import { mountExpenses, openNewExpense, showExpenses } from './views/gastos.js';
 import { resizeCharts, showSummary } from './views/resumen.js';
 import { addMonths, monthLabel, monthRange, todayISO } from './format.js';
 import { $, toast } from './dom.js';
@@ -15,6 +15,7 @@ let currentUserId = null;
 let categories = [];
 let month = todayISO().slice(0, 7);
 let loadSeq = 0;
+let installPrompt = null; // evento de Chrome para ofrecer "Instalar app"
 
 function show(screen) {
   for (const id of ['boot', 'setup', 'login', 'app']) $(`#${id}`).hidden = id !== screen;
@@ -48,16 +49,43 @@ function changeMonth(delta) {
   reload();
 }
 
-// ---------- Pestañas (solo pantallas angostas; en PC se ven ambas vistas) ----------
+// ---------- Menú: Inicio (gastos), Resumen y Ajustes ----------
+
+const TABS = ['gastos', 'resumen', 'ajustes'];
 
 function syncTab() {
-  const tab = location.hash === '#resumen' ? 'resumen' : 'gastos';
+  if (location.hash === '#nuevo') { // atajo del ícono instalado: "Agregar gasto"
+    history.replaceState(null, '', '#gastos');
+    if (currentUserId) openNewExpense();
+  }
+  const tab = TABS.find((t) => location.hash === `#${t}`) ?? 'gastos';
   $('#app').dataset.tab = tab;
-  for (const link of document.querySelectorAll('.tabs a')) {
+  for (const link of document.querySelectorAll('.nav a')) {
     if (link.dataset.tab === tab) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   }
-  if (tab === 'resumen') resizeCharts(); // los gráficos se dibujaron ocultos (tamaño 0)
+  if (tab !== 'ajustes') resizeCharts(); // los gráficos pudieron dibujarse ocultos (tamaño 0)
+}
+
+function wireInstall() {
+  const standalone = matchMedia('(display-mode: standalone)').matches;
+  if (standalone) $('#install-text').textContent = 'Ya la estás usando como app. ✅';
+  window.addEventListener('beforeinstallprompt', (ev) => {
+    ev.preventDefault();
+    installPrompt = ev;
+    $('#install').hidden = false;
+  });
+  $('#install').addEventListener('click', async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice;
+    installPrompt = null;
+    $('#install').hidden = true;
+  });
+  window.addEventListener('appinstalled', () => {
+    $('#install').hidden = true;
+    $('#install-text').textContent = 'App instalada. Ábrela desde tu pantalla de inicio. ✅';
+  });
 }
 
 // ---------- Sesión ----------
@@ -72,9 +100,10 @@ async function handleSession(session) {
   currentUserId = session.user.id;
   try {
     categories = await ensureCategories(currentUserId);
+    $('#account-email').textContent = session.user.email ?? '';
     show('app');
-    syncTab();
     mountExpenses({ categories, onDataChange: reload });
+    syncTab();
     await reload();
   } catch (err) {
     currentUserId = null;
@@ -118,6 +147,13 @@ function wireUi() {
     location.reload();
   });
 
+  $('#reset-config').addEventListener('click', async () => {
+    if (!confirm('¿Desconectar este dispositivo? Tendrás que pegar la clave de nuevo.')) return;
+    try { await signOut(); } catch { /* igual se olvida la clave */ }
+    clearConfig();
+    location.reload();
+  });
+
   $('#month-prev').addEventListener('click', () => changeMonth(-1));
   $('#month-next').addEventListener('click', () => changeMonth(1));
   window.addEventListener('hashchange', syncTab);
@@ -131,11 +167,12 @@ function main() {
   const cfg = readConfig();
   if (configError(cfg)) {
     show('setup');
-    showSetup(cfg);
+    showSetup();
     return;
   }
   initClient(cfg);
   wireUi();
+  wireInstall();
   // Diferido: llamar a Supabase dentro del callback de auth puede bloquearse (recomendación de supabase-js).
   onAuthChange((session) => setTimeout(() => handleSession(session), 0));
 }

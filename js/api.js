@@ -3,16 +3,15 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const PAGE_SIZE = 1000; // máximo de filas por respuesta en Supabase
 
-// [nombre, emoji, color]. Mismas que supabase/migracion-categorias.sql.
+// [nombre, emoji, color]. Mismas que supabase/migracion-categorias*.sql.
 export const DEFAULT_CATEGORIES = [
   ['Comida', '🛒', '#16a34a'],          // súper, almuerzos
-  ['Chatarra', '🍟', '#ea580c'],        // bajones: completos, papas fritas, snacks, dulces
+  ['Bajón', '🍟', '#ea580c'],           // completos, papas fritas, snacks, dulces
   ['Transporte', '🚌', '#2563eb'],      // bencina, micro, metro, Uber
   ['Cuentas', '🧾', '#ca8a04'],         // arriendo, luz, agua, gas, internet, plan celular
   ['Entretenimiento', '🎮', '#9333ea'], // juegos, suscripciones, salidas
   ['Ropa', '👕', '#db2777'],
   ['Salud', '💊', '#0891b2'],
-  ['Estudios', '📚', '#4f46e5'],
   ['Otros', '📦', '#64748b'],
 ];
 
