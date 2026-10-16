@@ -10,10 +10,11 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="./css/styles.css">
+  <!-- Subir ?v= en cada publicación para que el navegador no mezcle versiones en caché. -->
+  <link rel="stylesheet" href="./css/styles.css?v=4">
   <!-- config.js es local (gitignored). Si no existe (GitHub Pages), la app pide la clave. -->
   <script src="./config.js"></script>
-  <script type="module" src="./js/app.js"></script>
+  <script type="module" src="./js/app.js?v=4"></script>
 </head>
 <body>
   <div id="boot" class="boot" aria-live="polite">
