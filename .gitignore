@@ -1,0 +1,4 @@
+# Contiene la anon key real: nunca se sube.
+config.js
+node_modules/
+.DS_Store

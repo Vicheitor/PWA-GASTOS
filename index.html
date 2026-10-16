@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1d4ed8">
+  <title>Gastos</title>
+  <link rel="stylesheet" href="./css/styles.css">
+  <!-- config.js es local (gitignored). Si no existe (GitHub Pages), la app pide la clave. -->
+  <script src="./config.js"></script>
+  <script type="module" src="./js/app.js"></script>
+</head>
+<body>
+  <p id="boot" class="center muted">Cargando…</p>
+
+  <!-- Configuración inicial -->
+  <main id="setup" class="screen" hidden>
+    <h1>Configurar Supabase</h1>
+    <p class="muted">Se guarda solo en este dispositivo.</p>
+    <form id="setup-form" class="stack" novalidate>
+      <label for="setup-url">URL del API</label>
+      <input id="setup-url" name="url" type="url" required autocomplete="off">
+      <label for="setup-key">Anon key (publishable)</label>
+      <textarea id="setup-key" name="key" rows="4" required autocomplete="off" spellcheck="false"></textarea>
+      <p id="setup-error" class="error" role="alert"></p>
+      <button class="primary" type="submit">Guardar</button>
+    </form>
+  </main>
+
+  <!-- Login -->
+  <main id="login" class="screen" hidden>
+    <h1>Gastos</h1>
+    <form id="login-form" class="stack" novalidate>
+      <label for="login-email">Correo</label>
+      <input id="login-email" name="email" type="email" required autocomplete="email" inputmode="email">
+      <p id="login-msg" role="status"></p>
+      <button class="primary" type="submit">Enviarme enlace de acceso</button>
+    </form>
+  </main>
+
+  <!-- App -->
+  <div id="app" hidden>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="month-nav">
+          <button id="month-prev" type="button" class="icon" aria-label="Mes anterior">‹</button>
+          <h1 id="month-label" aria-live="polite"></h1>
+          <button id="month-next" type="button" class="icon" aria-label="Mes siguiente">›</button>
+        </div>
+        <button id="logout" type="button" class="link">Salir</button>
+      </div>
+    </header>
+
+    <main class="screen">
+      <section class="total-card" aria-labelledby="total-label">
+        <span id="total-label">Total del mes</span>
+        <strong id="month-total">$0</strong>
+        <span id="month-count"></span>
+      </section>
+
+      <div class="filters">
+        <label class="sr-only" for="filter-cat">Filtrar por categoría</label>
+        <select id="filter-cat"></select>
+        <label class="sr-only" for="filter-q">Buscar en notas</label>
+        <input id="filter-q" type="search" placeholder="Buscar en notas" autocomplete="off">
+      </div>
+
+      <div id="expense-list" aria-live="polite"></div>
+    </main>
+
+    <button id="add" type="button" class="fab" aria-label="Agregar gasto">+</button>
+  </div>
+
+  <dialog id="expense-dialog" aria-labelledby="form-title">
+    <form id="expense-form" class="stack" novalidate>
+      <h2 id="form-title">Nuevo gasto</h2>
+      <p id="f-locked" class="locked" hidden>🔒 Pasaron más de 12 horas: este gasto ya no se puede editar ni eliminar.</p>
+      <fieldset id="f-fields" class="stack">
+        <label for="f-amount">Monto</label>
+        <div class="amount-wrap">
+          <span aria-hidden="true">$</span>
+          <input id="f-amount" name="amount" class="amount" inputmode="numeric" autocomplete="off" enterkeyhint="next" required>
+        </div>
+        <fieldset>
+          <legend>Categoría</legend>
+          <div id="f-cats" class="chips"></div>
+        </fieldset>
+        <div class="row">
+          <div class="stack">
+            <label for="f-date">Fecha</label>
+            <input id="f-date" name="spent_on" type="date" required min="2000-01-01" max="2100-12-31">
+          </div>
+          <div class="stack">
+            <label for="f-note">Nota (opcional)</label>
+            <input id="f-note" name="note" maxlength="200" autocomplete="off" placeholder="Ej: almuerzo">
+          </div>
+        </div>
+      </fieldset>
+      <p id="f-error" class="error" role="alert"></p>
+      <div class="actions">
+        <button id="f-delete" type="button" class="danger" hidden>Eliminar</button>
+        <button id="f-cancel" type="button">Cancelar</button>
+        <button id="f-save" type="submit" class="primary">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
