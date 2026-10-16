@@ -4,8 +4,9 @@
 const targetId = (op) => (op.type === 'save' ? op.row.id : op.id);
 
 // Agrega op combinándola con lo pendiente del mismo gasto, para enviar solo lo necesario.
-export function queueOp(ops, op) {
-  const previous = ops.find((o) => targetId(o) === targetId(op));
+// inFlightOpId: operación que se está enviando ahora; no se toca (ya puede haber llegado al servidor).
+export function queueOp(ops, op, inFlightOpId = null) {
+  const previous = ops.find((o) => targetId(o) === targetId(op) && o.opId !== inFlightOpId);
   const rest = ops.filter((o) => o !== previous);
   if (op.type === 'save') return [...rest, { ...op, isNew: previous ? previous.isNew : op.isNew }];
   if (previous?.isNew) return rest; // se creó y se borró sin conexión: no hay nada que enviar

@@ -1,14 +1,15 @@
 // Cálculos puros sobre gastos { id, category_id, amount, spent_on, note }. Sin DOM ni red.
-import { addMonths, daysInMonth, formatCLP, isValidAmount, isValidISODate, MAX_AMOUNT } from './format.js';
-
-const MAX_NOTE = 200;
+import {
+  addMonths, daysInMonth, formatCLP, isValidAmount, isValidISODate, MAX_AMOUNT, MAX_CATEGORY_NAME, MAX_NOTE,
+  normalizeText, textLength,
+} from './format.js';
 
 // '' si el gasto es válido; si no, el mensaje para el usuario. Mismas reglas que schema.sql.
 export function validateExpense({ amount, category_id, spent_on, note }, categoryIds) {
   if (!isValidAmount(amount)) return `Ingresa un monto entre $1 y ${formatCLP(MAX_AMOUNT)}.`;
   if (!categoryIds.has(category_id)) return 'Elige una categoría.';
   if (!isValidISODate(spent_on)) return 'Ingresa una fecha válida.';
-  if (note && note.length > MAX_NOTE) return `La nota puede tener hasta ${MAX_NOTE} caracteres.`;
+  if (note && textLength(note) > MAX_NOTE) return `La nota puede tener hasta ${MAX_NOTE} caracteres.`;
   return '';
 }
 
@@ -31,13 +32,11 @@ export function groupByDay(expenses) {
     .map(([date, items]) => ({ date, items, total: sumAmounts(items) }));
 }
 
-const normalize = (s) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-
 export function filterExpenses(expenses, { categoryId = '', query = '' } = {}) {
-  const q = normalize(query.trim());
+  const q = normalizeText(query);
   return expenses.filter((e) =>
     (!categoryId || e.category_id === categoryId) &&
-    (!q || normalize(e.note ?? '').includes(q)));
+    (!q || normalizeText(e.note ?? '').includes(q)));
 }
 
 // ---------- Resumen del mes ----------
@@ -128,17 +127,16 @@ export function budgetReport(categories, expenses) {
     .sort((a, b) => b.ratio - a.ratio);
 }
 
-const MAX_CATEGORY_NAME = 40;
 const MAX_ICON = 8; // CHECK de schema.sql (en caracteres, como char_length)
 
 // '' si es válida; si no, el mensaje. otherNames: nombres de las demás categorías.
 export function validateCategory({ name, icon, color, monthly_budget }, otherNames) {
   const clean = name.trim();
-  const length = [...clean].length;
+  const length = textLength(clean);
   if (length < 1 || length > MAX_CATEGORY_NAME) return `El nombre debe tener entre 1 y ${MAX_CATEGORY_NAME} caracteres.`;
   const key = clean.toLocaleLowerCase('es');
   if (otherNames.some((n) => n.trim().toLocaleLowerCase('es') === key)) return 'Ya tienes una categoría con ese nombre.';
-  if (icon && [...icon].length > MAX_ICON) return 'El emoji es demasiado largo.';
+  if (icon && textLength(icon) > MAX_ICON) return 'El emoji es demasiado largo.';
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) return 'Elige un color válido.';
   if (monthly_budget !== null && !isValidAmount(monthly_budget)) {
     return `El presupuesto debe ser entre $1 y ${formatCLP(MAX_AMOUNT)}.`;

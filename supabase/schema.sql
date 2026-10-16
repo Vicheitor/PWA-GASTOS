@@ -29,10 +29,22 @@ create table if not exists public.expenses (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   -- Las FK ignoran RLS: la compuesta garantiza que la categoría es del mismo usuario.
-  foreign key (category_id, user_id) references public.categories (id, user_id) on delete restrict
+  constraint expenses_category_id_user_id_fkey
+    foreign key (category_id, user_id) references public.categories (id, user_id) on delete no action
 );
 
+-- "no action" (se revisa al final de la sentencia) en vez de "restrict": así borrar un usuario
+-- en auth.users puede eliminar en cascada sus categorías y gastos. Borrar una categoría que
+-- aún tiene gastos sigue fallando. Se recrea para actualizar instalaciones anteriores.
+alter table public.expenses drop constraint if exists expenses_category_id_user_id_fkey;
+alter table public.expenses add constraint expenses_category_id_user_id_fkey
+  foreign key (category_id, user_id) references public.categories (id, user_id) on delete no action;
+
 create index if not exists expenses_user_date_idx on public.expenses (user_id, spent_on);
+create index if not exists expenses_user_category_idx on public.expenses (user_id, category_id);
+
+-- Nombres de categoría únicos sin importar mayúsculas ni espacios ("Ropa" = "ropa ").
+create unique index if not exists categories_user_name_ci_key on public.categories (user_id, lower(btrim(name)));
 
 -- ============ Timestamps controlados por el servidor ============
 -- created_at define la ventana de edición de 12 h: el cliente no puede fijarlo ni cambiarlo.
@@ -94,8 +106,9 @@ create policy expenses_update on public.expenses for update to authenticated
 create policy expenses_delete on public.expenses for delete to authenticated
   using ((select auth.uid()) = user_id and created_at > now() - interval '12 hours');
 
--- Usuarios no autenticados no tienen nada que hacer aquí.
-revoke all on public.categories, public.expenses from anon;
+-- Permisos explícitos: anónimos nada; usuarios con sesión solo lo que usa la app (RLS filtra las filas).
+revoke all on public.categories, public.expenses from anon, authenticated;
+grant select, insert, update, delete on public.categories, public.expenses to authenticated;
 
 -- ============ Totales mensuales (gráfico de 12 meses) ============
 -- security invoker: respeta RLS, cada usuario solo suma sus gastos.
@@ -133,7 +146,9 @@ begin
   if uid is null then
     raise exception 'No autenticado' using errcode = '42501';
   end if;
-  if not exists (select 1 from public.categories where id = p_category and user_id = uid) then
+  -- for update: bloquea la categoría mientras se mueven sus gastos (evita carreras con otro dispositivo).
+  perform 1 from public.categories where id = p_category and user_id = uid for update;
+  if not found then
     raise exception 'La categoría no existe' using errcode = 'P0002';
   end if;
   if exists (select 1 from public.expenses where category_id = p_category and user_id = uid) then

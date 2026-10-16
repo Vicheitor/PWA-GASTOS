@@ -12,6 +12,14 @@ const dayFmt = new Intl.DateTimeFormat('es-CL', { weekday: 'long', day: 'numeric
 export const MAX_AMOUNT = 100_000_000;
 export const MIN_DATE = '2000-01-01';
 export const MAX_DATE = '2100-12-31';
+export const MAX_NOTE = 200;
+export const MAX_CATEGORY_NAME = 40;
+
+// Largo como lo cuenta Postgres (char_length): por caracteres, no por unidades UTF-16 (emoji).
+export const textLength = (s) => [...s].length;
+
+// Para comparar textos sin importar mayúsculas, tildes ni espacios de los extremos.
+export const normalizeText = (s) => s.trim().normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 export const formatCLP = (n) => clp.format(n);
 export const formatThousands = (n) => thousands.format(n);

@@ -4,8 +4,10 @@ import {
   ensureCategories, errorMessage, initClient, isNetworkError, listCategories, listExpenses, listMonthlyTotals,
   onAuthChange, sendMagicLink, signOut, storedUser,
 } from './api.js';
-import { initOffline, loadSnapshot, pendingOps, saveSnapshot, syncPending, withPending } from './offline.js';
-import { mountExpenses, openNewExpense, setCategories, showExpenses } from './views/gastos.js';
+import {
+  clearLocalData, initOffline, loadSnapshot, pendingOps, saveSnapshot, syncPending, withPending,
+} from './offline.js';
+import { mountExpenses, openNewExpense, setCategories, showExpenses, showLoadError } from './views/gastos.js';
 import { mountCategories, showCategories } from './views/categorias.js';
 import { mountBackup } from './views/respaldo.js';
 import { resizeCharts, showSummary } from './views/resumen.js';
@@ -20,6 +22,7 @@ let categories = [];
 let month = todayISO().slice(0, 7);
 let loadSeq = 0;
 let installPrompt = null; // evento de Chrome para ofrecer "Instalar app"
+let mounted = false; // las vistas se montan una sola vez por carga de página
 let syncProblems = []; // cambios que Supabase rechazó al sincronizar (se muestran hasta cerrarlos)
 
 function show(screen) {
@@ -58,46 +61,46 @@ function reportSyncFailures(failed) {
 
 // ---------- Datos del mes (compartidos por todas las vistas) ----------
 
-async function fetchMonth() {
+async function fetchMonth(ym) {
   // Las categorías también se recargan: pueden cambiar en otra vista o en otro dispositivo.
   const [freshCategories, expenses, previous, monthly] = await Promise.all([
     listCategories(),
-    listExpenses(...monthRange(month)),
-    listExpenses(...monthRange(addMonths(month, -1))),
-    listMonthlyTotals(`${addMonths(month, 1 - HISTORY_MONTHS)}-01`, monthRange(month)[1]),
+    listExpenses(...monthRange(ym)),
+    listExpenses(...monthRange(addMonths(ym, -1))),
+    listMonthlyTotals(`${addMonths(ym, 1 - HISTORY_MONTHS)}-01`, monthRange(ym)[1]),
   ]);
   return { categories: freshCategories, expenses, previous, monthly };
 }
 
 async function reload() {
   const seq = ++loadSeq;
-  $('#month-label').textContent = monthLabel(month);
+  const ym = month; // el usuario puede cambiar de mes mientras esto espera la red
+  $('#month-label').textContent = monthLabel(ym);
   await syncPending(); // primero lo pendiente, así lo que se lee ya lo incluye
   let data;
   let offline = false;
   let hasSnapshot = true;
   try {
-    data = await fetchMonth();
-    saveSnapshot(month, data);
+    data = await fetchMonth(ym);
+    saveSnapshot(ym, data);
   } catch (err) {
     if (seq !== loadSeq) return;
     if (!isNetworkError(err)) {
-      showExpenses([]);
-      toast(errorMessage(err));
+      showLoadError(`No se pudieron cargar los gastos: ${errorMessage(err)}`);
       return;
     }
-    const saved = loadSnapshot(month);
+    const saved = loadSnapshot(ym);
     offline = true;
     hasSnapshot = Boolean(saved.month);
     data = { expenses: [], previous: [], monthly: [], ...saved.month, categories: saved.categories ?? categories };
   }
   if (seq !== loadSeq) return; // el usuario ya cambió de mes
   categories = data.categories;
-  const expenses = withPending(data.expenses, monthRange(month));
-  const previous = withPending(data.previous, monthRange(addMonths(month, -1)));
+  const expenses = withPending(data.expenses, monthRange(ym));
+  const previous = withPending(data.previous, monthRange(addMonths(ym, -1)));
   setCategories(categories);
   showExpenses(expenses);
-  showSummary({ month, expenses, previous, monthly: data.monthly, categories });
+  showSummary({ month: ym, expenses, previous, monthly: data.monthly, categories });
   showCategories({ categories, expenses });
   showStatus(offline, hasSnapshot);
 }
@@ -151,9 +154,9 @@ function wireInstall() {
 // ---------- Sesión ----------
 
 // Categorías al iniciar; sin conexión, las guardadas en el dispositivo (null si no hay).
-async function startupCategories(userId) {
+async function startupCategories() {
   try {
-    return await ensureCategories(userId);
+    return await ensureCategories();
   } catch (err) {
     if (isNetworkError(err)) return loadSnapshot(month).categories;
     throw err;
@@ -173,7 +176,7 @@ async function handleSession(session) {
   currentUserId = user.id;
   initOffline(user.id, { onSyncFailures: reportSyncFailures });
   try {
-    categories = await startupCategories(user.id);
+    categories = await startupCategories();
     if (!categories) {
       currentUserId = null;
       show('login');
@@ -182,9 +185,12 @@ async function handleSession(session) {
     }
     $('#account-email').textContent = user.email ?? '';
     show('app');
-    mountExpenses({ categories, onDataChange: reload });
-    mountCategories({ onDataChange: reload });
-    mountBackup({ onDataChange: reload });
+    if (!mounted) {
+      mounted = true;
+      mountExpenses({ categories, onDataChange: reload });
+      mountCategories({ onDataChange: reload });
+      mountBackup({ onDataChange: reload });
+    }
     syncTab();
     await reload();
   } catch (err) {
@@ -220,18 +226,22 @@ function wireUi() {
   });
 
   $('#logout').addEventListener('click', async () => {
+    const pending = pendingOps().length;
+    if (pending && !confirm(`Tienes ${pending} ${pending === 1 ? 'cambio' : 'cambios'} sin enviar (sin conexión). Si sales, se perderán. ¿Salir igual?`)) return;
     try {
       await signOut();
     } catch (err) {
       toast(errorMessage(err));
       return;
     }
+    clearLocalData(); // en un dispositivo compartido no quedan tus gastos guardados
     location.reload();
   });
 
   $('#reset-config').addEventListener('click', async () => {
     if (!confirm('¿Desconectar este dispositivo? Tendrás que pegar la clave de nuevo.')) return;
     try { await signOut(); } catch { /* igual se olvida la clave */ }
+    clearLocalData();
     clearConfig();
     location.reload();
   });

@@ -2,6 +2,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 
 const PAGE_SIZE = 1000; // máximo de filas por respuesta en Supabase
+const REQUEST_TIMEOUT_MS = 15_000; // con mala señal ("lie-fi") una petición no queda colgada para siempre
 
 // [nombre, emoji, color]. Mismas que supabase/migracion-categorias*.sql.
 export const DEFAULT_CATEGORIES = [
@@ -17,8 +18,15 @@ export const DEFAULT_CATEGORIES = [
 
 let sb;
 
+function fetchWithTimeout(input, init = {}) {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const signal = !init.signal ? timeout : AbortSignal.any ? AbortSignal.any([init.signal, timeout]) : init.signal;
+  return fetch(input, { ...init, signal });
+}
+
 export function initClient({ supabaseUrl, supabaseAnonKey }) {
-  sb = createClient(supabaseUrl, supabaseAnonKey); // sesión persistente en localStorage por defecto
+  // Sesión persistente en localStorage (por defecto en supabase-js).
+  sb = createClient(supabaseUrl, supabaseAnonKey, { global: { fetch: fetchWithTimeout } });
 }
 
 function check({ data, error }) {
@@ -28,7 +36,15 @@ function check({ data, error }) {
 
 // Error por falta de conexión (no llegó a Supabase), a diferencia de un rechazo del servidor.
 export function isNetworkError(err) {
-  return !navigator.onLine || /failed to fetch|networkerror|network request failed|load failed|fetch failed/i.test(err?.message ?? '');
+  return !navigator.onLine || err?.name === 'TimeoutError'
+    || /failed to fetch|networkerror|network request failed|load failed|fetch failed|timeouterror|timed out|aborterror/i
+      .test(err?.message ?? '');
+}
+
+// Rechazo definitivo de Supabase (permisos/RLS, restricciones, datos inválidos): reintentar no sirve.
+// Otros errores (caídas 5xx, límites 429, sesión vencida) pueden pasar solos y se reintentan.
+export function isPermanentError(err) {
+  return /^(42501|LOCKED|23\d{3}|22\d{3}|P0002)$/.test(err?.code ?? '');
 }
 
 export function errorMessage(err) {
@@ -36,8 +52,9 @@ export function errorMessage(err) {
   if (err?.code === 'over_email_send_rate_limit' || err?.status === 429 || /rate limit/i.test(err?.message ?? '')) {
     return 'Se enviaron demasiados correos. Usa el último enlace que te llegó o espera cerca de una hora.';
   }
-  if (err?.code === '42501' || err?.code === 'LOCKED') {
-    return 'Este gasto tiene más de 12 horas y ya no se puede modificar.';
+  if (err?.code === 'LOCKED') return 'Este gasto tiene más de 12 horas y ya no se puede modificar.';
+  if (err?.code === '42501') {
+    return 'No se permitió el cambio: el gasto tiene más de 12 horas o tu sesión expiró (vuelve a entrar).';
   }
   if (err?.code === '23503') return 'La categoría no existe o todavía tiene gastos asociados.';
   if (err?.code === '23514') return 'Algún dato no cumple las reglas (monto, fecha o largo).';
@@ -52,7 +69,8 @@ export const onAuthChange = (cb) => sb.auth.onAuthStateChange((_event, session) 
 export async function sendMagicLink(email) {
   check(await sb.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: location.href.split('#')[0] },
+    // shouldCreateUser: false → la app solo deja entrar a cuentas que ya existen (es de uso personal).
+    options: { emailRedirectTo: location.href.split('#')[0], shouldCreateUser: false },
   }));
 }
 
@@ -67,8 +85,11 @@ export function storedUser() {
   }
 }
 
+// Sin conexión no se puede avisar al servidor: se cierra igual la sesión en este dispositivo.
 export async function signOut() {
-  check(await sb.auth.signOut());
+  const { error } = await sb.auth.signOut();
+  if (error && isNetworkError(error)) check(await sb.auth.signOut({ scope: 'local' }));
+  else if (error) throw error;
 }
 
 // ---------- Categorías ----------
@@ -79,11 +100,12 @@ export async function listCategories() {
 
 // Crea las categorías iniciales si el usuario no tiene ninguna.
 // ignoreDuplicates + unique(user_id, name) evita duplicados si dos dispositivos lo hacen a la vez.
-export async function ensureCategories(userId) {
+export async function ensureCategories() {
   const existing = await listCategories();
   if (existing.length) return existing;
   check(await sb.from('categories').upsert(
-    DEFAULT_CATEGORIES.map(([name, icon, color]) => ({ user_id: userId, name, icon, color })),
+    // user_id lo pone la base (default auth.uid()), no el cliente.
+    DEFAULT_CATEGORIES.map(([name, icon, color]) => ({ name, icon, color })),
     { onConflict: 'user_id,name', ignoreDuplicates: true },
   ));
   return listCategories();

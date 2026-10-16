@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Solo se ejecuta código de la app y de jsDelivr; datos solo hacia Supabase. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src https://*.supabase.co; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
   <meta name="theme-color" content="#f3f4f7" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0c0e13" media="(prefers-color-scheme: dark)">
   <meta name="description" content="Registra y analiza tus gastos mensuales.">
@@ -11,10 +13,10 @@
   <link rel="icon" href="./icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
   <!-- Subir ?v= en cada publicación para que el navegador no mezcle versiones en caché. -->
-  <link rel="stylesheet" href="./css/styles.css?v=9">
+  <link rel="stylesheet" href="./css/styles.css?v=10">
   <!-- config.js es local (gitignored). Si no existe (GitHub Pages), la app pide la clave. -->
   <script src="./config.js"></script>
-  <script type="module" src="./js/app.js?v=9"></script>
+  <script type="module" src="./js/app.js?v=10"></script>
 </head>
 <body>
   <div id="boot" class="boot" aria-live="polite">
@@ -22,19 +24,10 @@
     <span class="sr-only">Cargando…</span>
     <div class="boot-stuck">
       <p>La app está tardando en abrir.</p>
-      <button type="button" class="primary" onclick="location.reload()">Reintentar</button>
+      <button id="boot-retry" type="button" class="primary">Reintentar</button>
     </div>
   </div>
-  <script>
-    // Service worker aquí (no en app.js): se registra aunque algún módulo falle al cargar.
-    // Hace que la app siempre use la versión publicada y abra sin internet.
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(function () {});
-    // Si la app no arranca (sin conexión o un archivo que no cargó), ofrecer reintentar en vez de quedar pegada.
-    setTimeout(function () {
-      var boot = document.getElementById('boot');
-      if (boot && !boot.hidden) boot.classList.add('is-stuck');
-    }, 8000);
-  </script>
+  <script src="./js/boot.js?v=10"></script>
 
   <!-- Configuración inicial (una vez por dispositivo) -->
   <main id="setup" class="auth" hidden>

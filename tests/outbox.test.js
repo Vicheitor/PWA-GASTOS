@@ -41,3 +41,11 @@ test('applyPending: agrega, reemplaza, elimina y marca pendientes; respeta el ra
   assert.deepEqual(result.map((e) => [e.id, e.amount, Boolean(e.pending)]), [['n', 3000, true], ['x', 999, true]]);
   assert.equal(server.length, 2); // no modifica la lista original
 });
+
+test('queueOp: no combina con la operación que se está enviando (ya pudo llegar al servidor)', () => {
+  const sending = save(row('a', '2026-10-16', 1000), true, 'op-1');
+  const withDelete = queueOp([sending], del('a'), 'op-1');
+  assert.deepEqual(withDelete.map((o) => o.opId), ['op-1', 'a-del']); // el borrado se envía después
+  const withEdit = queueOp([sending], save(row('a', '2026-10-16', 2000), false, 'op-2'), 'op-1');
+  assert.deepEqual(withEdit.map((o) => [o.opId, o.isNew]), [['op-1', true], ['op-2', false]]);
+});

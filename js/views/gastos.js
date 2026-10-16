@@ -13,6 +13,7 @@ let state = {
   categories: [],
   filter: { categoryId: '', query: '' },
   loading: true,
+  error: '',
 };
 let editing = null;
 let onChange = async () => {}; // recarga los datos (la define app.js)
@@ -24,7 +25,13 @@ const catLabel = (c) => (c.icon ? `${c.icon} ${c.name}` : c.name);
 
 // expenses = null mientras carga.
 export function showExpenses(expenses) {
-  state = { ...state, expenses: expenses ?? [], loading: expenses === null };
+  state = { ...state, expenses: expenses ?? [], loading: expenses === null, error: '' };
+  render();
+}
+
+// Falló la carga (no por falta de conexión): no mostrar "Sin gastos" ni $0 como si fueran datos.
+export function showLoadError(message) {
+  state = { ...state, expenses: [], loading: false, error: message };
   render();
 }
 
@@ -70,6 +77,7 @@ function renderDay(day, categories, today) {
 
 function emptyMessage(filtering) {
   if (state.loading) return 'Cargando…';
+  if (state.error) return `${state.error} Desliza o vuelve a abrir la app para reintentar.`;
   return filtering ? 'Ningún gasto coincide con el filtro.' : 'Sin gastos este mes. Toca + para agregar.';
 }
 

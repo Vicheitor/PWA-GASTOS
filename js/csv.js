@@ -1,15 +1,15 @@
 // CSV de gastos con columnas fecha, categoria, monto, nota. Funciones puras: sin DOM ni red.
-import { isValidAmount, isValidISODate } from './format.js';
+import {
+  isValidAmount, isValidISODate, MAX_CATEGORY_NAME, MAX_NOTE, normalizeText as normalize, textLength,
+} from './format.js';
 
 // Excel en español (Chile) separa columnas con punto y coma; al importar se detecta solo.
 export const CSV_DELIMITER = ';';
 export const MAX_IMPORT_ROWS = 5000;
 const COLUMNS = ['fecha', 'categoria', 'monto', 'nota'];
-const MAX_NOTE = 200;
-const MAX_CATEGORY_NAME = 40;
 const FORMULA_START = /^[=+\-@\t\r]/;
-
-const normalize = (s) => s.trim().normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+// Quita el ' que la exportación agrega delante de = + - @ (ver escapeField).
+const unescapeFormula = (s) => s.replace(/^'(?=[=+\-@])/, '');
 
 // ---------- Exportar ----------
 
@@ -118,8 +118,8 @@ const expenseKey = (date, category, amount, note) => `${date}|${normalize(catego
 function rowProblem(record, { spent_on, amount, categoryName, note }) {
   if (!spent_on) return `fecha inválida ("${record.fecha.trim()}")`;
   if (amount === null) return `monto inválido ("${record.monto.trim()}")`;
-  if (!categoryName || [...categoryName].length > MAX_CATEGORY_NAME) return 'categoría vacía o muy larga';
-  if (note && note.length > MAX_NOTE) return `nota de más de ${MAX_NOTE} caracteres`;
+  if (!categoryName || textLength(categoryName) > MAX_CATEGORY_NAME) return 'categoría vacía o muy larga';
+  if (note && textLength(note) > MAX_NOTE) return `nota de más de ${MAX_NOTE} caracteres`;
   return '';
 }
 
@@ -141,8 +141,8 @@ export function planImport(records, categories, existing) {
   for (const r of records) {
     const spent_on = parseCsvDate(r.fecha);
     const amount = parseCsvAmount(r.monto);
-    const rawName = r.categoria.trim();
-    const note = r.nota.trim().replace(/^'(?=[=+\-@])/, '') || null; // quita el ' que agrega la exportación
+    const rawName = unescapeFormula(r.categoria.trim());
+    const note = unescapeFormula(r.nota.trim()) || null;
     const problem = rowProblem(r, { spent_on, amount, categoryName: rawName, note });
     if (problem) {
       errors.push({ line: r.line, message: problem });

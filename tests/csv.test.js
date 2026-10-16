@@ -80,3 +80,11 @@ test('planImport: categorías nuevas, errores por fila y duplicados contra lo ex
   ]);
   assert.deepEqual(plan.errors.map((e) => e.line), [6, 7]);
 });
+
+test('una categoría que empieza con = sobrevive exportar e importar sin duplicarse', () => {
+  const csv = toCsv([{ spent_on: '2026-10-01', category_id: 'x', amount: 100, note: null }], new Map([['x', '=Raro']]));
+  const { records } = readExpensesCsv(csv);
+  const plan = planImport(records, [{ name: '=Raro' }], [{ spent_on: '2026-10-01', categoryName: '=Raro', amount: 100, note: null }]);
+  assert.equal(plan.duplicates, 1);
+  assert.deepEqual(plan.newCategories, []);
+});
