@@ -101,3 +101,47 @@ export function fillMonths(rows, endYm, count = 12) {
     return { month, total: byMonth.get(month) ?? 0 };
   });
 }
+
+// ---------- Categorías y presupuestos ----------
+
+export const BUDGET_WARN_RATIO = 0.8;
+
+// null sin presupuesto. level: 'ok' (< 80 %), 'warn' (80–100 %), 'over' (lo superó).
+export function budgetStatus(spent, budget) {
+  if (!budget) return null;
+  const ratio = spent / budget;
+  return {
+    spent,
+    budget,
+    ratio,
+    remaining: budget - spent,
+    level: ratio > 1 ? 'over' : ratio >= BUDGET_WARN_RATIO ? 'warn' : 'ok',
+  };
+}
+
+// Categorías con presupuesto y cómo van en el mes; las más comprometidas primero.
+export function budgetReport(categories, expenses) {
+  const spentBy = new Map(totalsByCategory(expenses).map((r) => [r.category_id, r.total]));
+  return categories
+    .filter((c) => c.monthly_budget)
+    .map((c) => ({ category: c, ...budgetStatus(spentBy.get(c.id) ?? 0, c.monthly_budget) }))
+    .sort((a, b) => b.ratio - a.ratio);
+}
+
+const MAX_CATEGORY_NAME = 40;
+const MAX_ICON = 8; // CHECK de schema.sql (en caracteres, como char_length)
+
+// '' si es válida; si no, el mensaje. otherNames: nombres de las demás categorías.
+export function validateCategory({ name, icon, color, monthly_budget }, otherNames) {
+  const clean = name.trim();
+  const length = [...clean].length;
+  if (length < 1 || length > MAX_CATEGORY_NAME) return `El nombre debe tener entre 1 y ${MAX_CATEGORY_NAME} caracteres.`;
+  const key = clean.toLocaleLowerCase('es');
+  if (otherNames.some((n) => n.trim().toLocaleLowerCase('es') === key)) return 'Ya tienes una categoría con ese nombre.';
+  if (icon && [...icon].length > MAX_ICON) return 'El emoji es demasiado largo.';
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) return 'Elige un color válido.';
+  if (monthly_budget !== null && !isValidAmount(monthly_budget)) {
+    return `El presupuesto debe ser entre $1 y ${formatCLP(MAX_AMOUNT)}.`;
+  }
+  return '';
+}

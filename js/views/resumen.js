@@ -1,7 +1,8 @@
 // Vista de resumen: indicadores del mes, gasto por categoría y gráficos (Chart.js bajo demanda).
-import { dailyTotals, elapsedDays, fillMonths, monthSummary, totalsByCategory } from '../calc.js';
+import { budgetReport, dailyTotals, elapsedDays, fillMonths, monthSummary, totalsByCategory } from '../calc.js';
 import { addMonths, formatCLP, todayISO } from '../format.js';
 import { $, h } from '../dom.js';
+import { budgetBadge, budgetBar, budgetDetail } from './budget.js';
 
 const CHART_URL = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/auto/+esm';
 const FALLBACK_COLOR = '#64748b';
@@ -76,6 +77,28 @@ function renderCategories(expenses, categories) {
           h('span', { class: 'cat-pct' }, `${percent.format(share * 100)}%`))),
       h('div', { class: 'bar', 'aria-hidden': 'true' },
         h('span', { style: `width:${(share * 100).toFixed(1)}%` })));
+  }));
+}
+
+// ---------- Presupuestos ----------
+
+function renderBudgets(categories, expenses) {
+  const report = budgetReport(categories, expenses);
+  if (!report.length) {
+    $('#budget-list').replaceChildren(h('li', { class: 'empty' },
+      'Aún no tienes presupuestos. ', h('a', { href: '#categorias' }, 'Ponlos en Categorías'), '.'));
+    return;
+  }
+  $('#budget-list').replaceChildren(...report.map((status) => {
+    const { category } = status;
+    return h('li', { style: `--cat:${category.color}` },
+      h('div', { class: 'cat-row' },
+        h('span', { class: 'cat-name' },
+          h('span', { class: 'cat-icon sm', 'aria-hidden': 'true' }, category.icon ?? '•'),
+          category.name),
+        budgetBadge(status)),
+      budgetBar(status),
+      h('p', { class: 'budget-detail' }, budgetDetail(status)));
   }));
 }
 
@@ -198,6 +221,7 @@ export function showSummary(data) {
   lastData = data;
   const categories = new Map(data.categories.map((c) => [c.id, c]));
   renderKpis(monthSummary(data.expenses, data.previous, data.month, todayISO()), data.expenses.length, data.month);
+  renderBudgets(data.categories, data.expenses);
   renderCategories(data.expenses, categories);
   renderCharts(data);
 }

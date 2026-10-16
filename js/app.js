@@ -1,9 +1,11 @@
 // Arranque: configuración → sesión → app. También maneja el mes elegido, la carga de datos y las pestañas.
 import { clearConfig, configError, readConfig, showSetup } from './setup.js';
 import {
-  ensureCategories, errorMessage, initClient, listExpenses, listMonthlyTotals, onAuthChange, sendMagicLink, signOut,
+  ensureCategories, errorMessage, initClient, listCategories, listExpenses, listMonthlyTotals, onAuthChange,
+  sendMagicLink, signOut,
 } from './api.js';
-import { mountExpenses, openNewExpense, showExpenses } from './views/gastos.js';
+import { mountExpenses, openNewExpense, setCategories, showExpenses } from './views/gastos.js';
+import { mountCategories, showCategories } from './views/categorias.js';
 import { resizeCharts, showSummary } from './views/resumen.js';
 import { addMonths, monthLabel, monthRange, todayISO } from './format.js';
 import { $, toast } from './dom.js';
@@ -27,14 +29,19 @@ async function reload() {
   const seq = ++loadSeq;
   $('#month-label').textContent = monthLabel(month);
   try {
-    const [expenses, previous, monthly] = await Promise.all([
+    // Las categorías también se recargan: pueden cambiar en esta vista o en otro dispositivo.
+    const [freshCategories, expenses, previous, monthly] = await Promise.all([
+      listCategories(),
       listExpenses(...monthRange(month)),
       listExpenses(...monthRange(addMonths(month, -1))),
       listMonthlyTotals(`${addMonths(month, 1 - HISTORY_MONTHS)}-01`, monthRange(month)[1]),
     ]);
     if (seq !== loadSeq) return; // el usuario ya cambió de mes
+    categories = freshCategories;
+    setCategories(categories);
     showExpenses(expenses);
     showSummary({ month, expenses, previous, monthly, categories });
+    showCategories({ categories, expenses });
   } catch (err) {
     if (seq !== loadSeq) return;
     showExpenses([]);
@@ -51,7 +58,7 @@ function changeMonth(delta) {
 
 // ---------- Menú: Inicio (gastos), Resumen y Ajustes ----------
 
-const TABS = ['gastos', 'resumen', 'ajustes'];
+const TABS = ['gastos', 'resumen', 'categorias', 'ajustes'];
 
 function syncTab() {
   if (location.hash === '#nuevo') { // atajo del ícono instalado: "Agregar gasto"
@@ -64,7 +71,7 @@ function syncTab() {
     if (link.dataset.tab === tab) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   }
-  if (tab !== 'ajustes') resizeCharts(); // los gráficos pudieron dibujarse ocultos (tamaño 0)
+  if (tab === 'gastos' || tab === 'resumen') resizeCharts(); // los gráficos pudieron dibujarse ocultos (tamaño 0)
 }
 
 function wireInstall() {
@@ -103,6 +110,7 @@ async function handleSession(session) {
     $('#account-email').textContent = session.user.email ?? '';
     show('app');
     mountExpenses({ categories, onDataChange: reload });
+    mountCategories({ onDataChange: reload });
     syncTab();
     await reload();
   } catch (err) {

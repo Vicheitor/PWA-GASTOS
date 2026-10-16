@@ -1,11 +1,11 @@
 // Vista de gastos: lista del mes agrupada por día, filtros y formulario de alta/edición.
 import { deleteExpense, errorMessage, saveExpense } from '../api.js';
-import { filterExpenses, groupByDay, isEditable, sumAmounts, validateExpense } from '../calc.js';
+import { budgetReport, filterExpenses, groupByDay, isEditable, sumAmounts, validateExpense } from '../calc.js';
 import { dayLabel, formatCLP, formatThousands, parseAmount, todayISO } from '../format.js';
-import { $, h, toast } from '../dom.js';
+import { $, bindAmountInput, h, toast, withBusy } from '../dom.js';
+import { budgetAlertText } from './budget.js';
 
 const FALLBACK_COLOR = '#64748b';
-const MAX_AMOUNT_DIGITS = 9;
 
 let state = {
   expenses: [],
@@ -24,6 +24,15 @@ const catLabel = (c) => (c.icon ? `${c.icon} ${c.name}` : c.name);
 // expenses = null mientras carga.
 export function showExpenses(expenses) {
   state = { ...state, expenses: expenses ?? [], loading: expenses === null };
+  render();
+}
+
+// Las categorías se recargan con cada actualización; los botones del formulario solo se
+// redibujan si cambiaron (así no se pierde la selección si el formulario está abierto).
+export function setCategories(categories) {
+  if (JSON.stringify(categories) === JSON.stringify(state.categories)) return;
+  state = { ...state, categories };
+  renderCategoryControls();
   render();
 }
 
@@ -71,6 +80,9 @@ function render() {
   $('#total-label').textContent = filtering ? 'Total filtrado' : 'Total del mes';
   $('#month-total').textContent = formatCLP(sumAmounts(visible));
   $('#month-count').textContent = visible.length === 1 ? '1 gasto' : `${visible.length} gastos`;
+  const alerts = budgetReport(state.categories, state.expenses).filter((r) => r.level !== 'ok');
+  $('#budget-alerts').replaceChildren(...alerts.map((r) =>
+    h('p', { class: `alert ${r.level}` }, budgetAlertText(r))));
   $('#expense-list').setAttribute('aria-busy', String(state.loading));
   $('#expense-list').replaceChildren(...(days.length
     ? days.map((d) => renderDay(d, categories, today))
@@ -116,18 +128,6 @@ function openForm(expense = null) {
   if (!locked) form.amount.focus();
 }
 
-// Muestra el error dentro del formulario: el diálogo sigue abierto y no se pierde lo escrito.
-async function withBusy(button, action) {
-  button.disabled = true;
-  try {
-    await action();
-  } catch (err) {
-    $('#f-error').textContent = errorMessage(err);
-  } finally {
-    button.disabled = false;
-  }
-}
-
 async function onSubmit(ev) {
   ev.preventDefault();
   if ($('#f-fields').disabled) return;
@@ -142,29 +142,23 @@ async function onSubmit(ev) {
   const error = validateExpense(row, new Set(state.categories.map((c) => c.id)));
   $('#f-error').textContent = error;
   if (error) return;
-  await withBusy($('#f-save'), async () => {
+  await withBusy($('#f-save'), $('#f-error'), async () => {
     await saveExpense(row);
     $('#expense-dialog').close();
     toast(editing ? 'Gasto actualizado' : 'Gasto guardado');
     await onChange();
-  });
+  }, errorMessage);
 }
 
 async function onDelete() {
   if (!editing || !confirm('¿Eliminar este gasto?')) return;
   const { id } = editing;
-  await withBusy($('#f-delete'), async () => {
+  await withBusy($('#f-delete'), $('#f-error'), async () => {
     await deleteExpense(id);
     $('#expense-dialog').close();
     toast('Gasto eliminado');
     await onChange();
-  });
-}
-
-// Formatea con puntos de miles mientras se escribe.
-function onAmountInput(ev) {
-  const digits = ev.target.value.replace(/\D/g, '').slice(0, MAX_AMOUNT_DIGITS);
-  ev.target.value = digits ? formatThousands(Number(digits)) : '';
+  }, errorMessage);
 }
 
 export const openNewExpense = () => openForm();
@@ -180,7 +174,7 @@ export function mountExpenses({ categories, onDataChange }) {
   $('#add').addEventListener('click', () => openForm());
   $('#f-cancel').addEventListener('click', () => $('#expense-dialog').close());
   $('#f-delete').addEventListener('click', onDelete);
-  $('#f-amount').addEventListener('input', onAmountInput);
+  bindAmountInput($('#f-amount'));
   $('#expense-form').addEventListener('submit', onSubmit);
   render();
 }

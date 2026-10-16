@@ -75,6 +75,18 @@ export async function ensureCategories(userId) {
   return listCategories();
 }
 
+// Crea (sin id) o actualiza (con id) una categoría.
+export async function saveCategory({ id, name, icon, color, monthly_budget }) {
+  const row = { name: name.trim(), icon: icon || null, color, monthly_budget };
+  if (id) check(await sb.from('categories').update(row).eq('id', id));
+  else check(await sb.from('categories').insert(row));
+}
+
+// Mueve sus gastos a moveTo (si tiene) y la elimina, todo en la base (ver delete_category en schema.sql).
+export async function deleteCategory(id, moveTo) {
+  check(await sb.rpc('delete_category', { p_category: id, p_move_to: moveTo || null }));
+}
+
 // ---------- Gastos ----------
 
 // Gastos con spent_on en [fromDate, toDate), paginando para no cortar en 1000 filas.

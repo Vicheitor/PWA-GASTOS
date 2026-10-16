@@ -116,3 +116,36 @@ $$;
 
 revoke execute on function public.monthly_totals(date, date) from public, anon;
 grant execute on function public.monthly_totals(date, date) to authenticated;
+
+-- ============ Eliminar categoría moviendo sus gastos ============
+-- security definer porque los gastos de más de 12 h no se pueden editar por RLS; la función
+-- valida que ambas categorías sean del usuario y solo cambia la categoría de sus gastos.
+
+create or replace function public.delete_category(p_category uuid, p_move_to uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if uid is null then
+    raise exception 'No autenticado' using errcode = '42501';
+  end if;
+  if not exists (select 1 from public.categories where id = p_category and user_id = uid) then
+    raise exception 'La categoría no existe' using errcode = 'P0002';
+  end if;
+  if exists (select 1 from public.expenses where category_id = p_category and user_id = uid) then
+    if p_move_to is null or p_move_to = p_category
+       or not exists (select 1 from public.categories where id = p_move_to and user_id = uid) then
+      raise exception 'Elige otra categoría para mover los gastos' using errcode = '22023';
+    end if;
+    update public.expenses set category_id = p_move_to where category_id = p_category and user_id = uid;
+  end if;
+  delete from public.categories where id = p_category and user_id = uid;
+end;
+$$;
+
+revoke execute on function public.delete_category(uuid, uuid) from public, anon;
+grant execute on function public.delete_category(uuid, uuid) to authenticated;
