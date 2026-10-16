@@ -1,15 +1,66 @@
-// Arranque: configuración → sesión → app.
+// Arranque: configuración → sesión → app. También maneja el mes elegido, la carga de datos y las pestañas.
 import { configError, readConfig, showSetup } from './setup.js';
-import { ensureCategories, errorMessage, initClient, onAuthChange, sendMagicLink, signOut } from './api.js';
-import { mountExpenses, refresh } from './views/gastos.js';
+import {
+  ensureCategories, errorMessage, initClient, listExpenses, listMonthlyTotals, onAuthChange, sendMagicLink, signOut,
+} from './api.js';
+import { mountExpenses, showExpenses } from './views/gastos.js';
+import { resizeCharts, showSummary } from './views/resumen.js';
+import { addMonths, monthLabel, monthRange, todayISO } from './format.js';
 import { $, toast } from './dom.js';
 
 const EMAIL_KEY = 'gastos.email';
+const HISTORY_MONTHS = 12;
+
 let currentUserId = null;
+let categories = [];
+let month = todayISO().slice(0, 7);
+let loadSeq = 0;
 
 function show(screen) {
   for (const id of ['boot', 'setup', 'login', 'app']) $(`#${id}`).hidden = id !== screen;
 }
+
+// ---------- Datos del mes (compartidos por Gastos y Resumen) ----------
+
+async function reload() {
+  const seq = ++loadSeq;
+  $('#month-label').textContent = monthLabel(month);
+  try {
+    const [expenses, previous, monthly] = await Promise.all([
+      listExpenses(...monthRange(month)),
+      listExpenses(...monthRange(addMonths(month, -1))),
+      listMonthlyTotals(`${addMonths(month, 1 - HISTORY_MONTHS)}-01`, monthRange(month)[1]),
+    ]);
+    if (seq !== loadSeq) return; // el usuario ya cambió de mes
+    showExpenses(expenses);
+    showSummary({ month, expenses, previous, monthly, categories });
+  } catch (err) {
+    if (seq !== loadSeq) return;
+    showExpenses([]);
+    toast(errorMessage(err));
+  }
+}
+
+function changeMonth(delta) {
+  month = addMonths(month, delta);
+  showExpenses(null);
+  showSummary(null);
+  reload();
+}
+
+// ---------- Pestañas (solo pantallas angostas; en PC se ven ambas vistas) ----------
+
+function syncTab() {
+  const tab = location.hash === '#resumen' ? 'resumen' : 'gastos';
+  $('#app').dataset.tab = tab;
+  for (const link of document.querySelectorAll('.tabs a')) {
+    if (link.dataset.tab === tab) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  }
+  if (tab === 'resumen') resizeCharts(); // los gráficos se dibujaron ocultos (tamaño 0)
+}
+
+// ---------- Sesión ----------
 
 async function handleSession(session) {
   if (!session) {
@@ -20,9 +71,11 @@ async function handleSession(session) {
   if (session.user.id === currentUserId) return; // p. ej. TOKEN_REFRESHED
   currentUserId = session.user.id;
   try {
-    const categories = await ensureCategories(currentUserId);
+    categories = await ensureCategories(currentUserId);
     show('app');
-    await mountExpenses(categories);
+    syncTab();
+    mountExpenses({ categories, onDataChange: reload });
+    await reload();
   } catch (err) {
     currentUserId = null;
     show('login');
@@ -30,7 +83,7 @@ async function handleSession(session) {
   }
 }
 
-function wireLogin() {
+function wireUi() {
   const form = $('#login-form');
   const msg = $('#login-msg');
   try { form.email.value = localStorage.getItem(EMAIL_KEY) ?? ''; } catch { /* almacenamiento bloqueado */ }
@@ -64,6 +117,14 @@ function wireLogin() {
     }
     location.reload();
   });
+
+  $('#month-prev').addEventListener('click', () => changeMonth(-1));
+  $('#month-next').addEventListener('click', () => changeMonth(1));
+  window.addEventListener('hashchange', syncTab);
+  // Sincronización entre dispositivos: recargar al volver a la app.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && currentUserId) reload();
+  });
 }
 
 function main() {
@@ -74,13 +135,9 @@ function main() {
     return;
   }
   initClient(cfg);
-  wireLogin();
+  wireUi();
   // Diferido: llamar a Supabase dentro del callback de auth puede bloquearse (recomendación de supabase-js).
   onAuthChange((session) => setTimeout(() => handleSession(session), 0));
-  // Sincronización entre dispositivos: recargar al volver a la app.
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && currentUserId) refresh();
-  });
 }
 
 main();

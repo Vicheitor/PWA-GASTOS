@@ -1,5 +1,5 @@
 // Cálculos puros sobre gastos { id, category_id, amount, spent_on, note }. Sin DOM ni red.
-import { formatCLP, isValidAmount, isValidISODate, MAX_AMOUNT } from './format.js';
+import { addMonths, daysInMonth, formatCLP, isValidAmount, isValidISODate, MAX_AMOUNT } from './format.js';
 
 const MAX_NOTE = 200;
 
@@ -38,4 +38,66 @@ export function filterExpenses(expenses, { categoryId = '', query = '' } = {}) {
   return expenses.filter((e) =>
     (!categoryId || e.category_id === categoryId) &&
     (!q || normalize(e.note ?? '').includes(q)));
+}
+
+// ---------- Resumen del mes ----------
+
+const dayOf = (iso) => Number(iso.slice(8, 10));
+
+// Días del mes ya transcurridos: el mes en curso cuenta hasta hoy, los pasados completos, los futuros 0.
+export function elapsedDays(ym, today) {
+  const current = today.slice(0, 7);
+  if (ym > current) return 0;
+  return ym === current ? dayOf(today) : daysInMonth(ym);
+}
+
+export const sumUpToDay = (expenses, day) => sumAmounts(expenses.filter((e) => dayOf(e.spent_on) <= day));
+
+// pct es null si el mes anterior fue 0 (no hay base para un porcentaje).
+export function compareTotals(current, previous) {
+  const diff = current - previous;
+  return { current, previous, diff, pct: previous > 0 ? (diff / previous) * 100 : null };
+}
+
+// En el mes en curso compara días 1..N contra los mismos días del mes anterior;
+// en meses pasados compara meses completos.
+export function monthSummary(expenses, previousExpenses, ym, today) {
+  const days = elapsedDays(ym, today);
+  const total = sumAmounts(expenses);
+  const partial = days > 0 && days < daysInMonth(ym);
+  // Mes completo: el anterior va entero aunque tenga más días (ej: 31 ago al comparar septiembre).
+  const previous = partial ? sumUpToDay(previousExpenses, days) : sumAmounts(previousExpenses);
+  return {
+    total,
+    days,
+    average: days > 0 ? Math.round(total / days) : 0,
+    partial,
+    comparison: compareTotals(sumUpToDay(expenses, days), previous),
+  };
+}
+
+// [{ category_id, total, share }] de mayor a menor; share en 0..1.
+export function totalsByCategory(expenses) {
+  const totals = new Map();
+  for (const e of expenses) totals.set(e.category_id, (totals.get(e.category_id) ?? 0) + e.amount);
+  const grand = sumAmounts(expenses);
+  return [...totals.entries()]
+    .map(([category_id, total]) => ({ category_id, total, share: grand ? total / grand : 0 }))
+    .sort((a, b) => b.total - a.total);
+}
+
+// Total por día del mes: índice 0 = día 1.
+export function dailyTotals(expenses, ym) {
+  const days = Array(daysInMonth(ym)).fill(0);
+  for (const e of expenses) days[dayOf(e.spent_on) - 1] += e.amount;
+  return days;
+}
+
+// rows de monthly_totals ({ month: 'YYYY-MM-01', total }) → los `count` meses que terminan en endYm, con 0 si falta.
+export function fillMonths(rows, endYm, count = 12) {
+  const byMonth = new Map(rows.map((r) => [r.month.slice(0, 7), Number(r.total)]));
+  return Array.from({ length: count }, (_, i) => {
+    const month = addMonths(endYm, i - count + 1);
+    return { month, total: byMonth.get(month) ?? 0 };
+  });
 }

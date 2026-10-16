@@ -92,6 +92,11 @@ export async function listExpenses(fromDate, toDate) {
   }
 }
 
+// Totales por mes agregados en SQL (no trae filas sueltas, así no choca con el límite de 1000).
+export async function listMonthlyTotals(fromDate, toDate) {
+  return check(await sb.rpc('monthly_totals', { p_from: fromDate, p_to: toDate }));
+}
+
 // Inserta o actualiza por id (el id lo genera el cliente).
 // Si el gasto tiene más de 12 h, RLS rechaza la actualización con 42501.
 export async function saveExpense({ id, category_id, amount, spent_on, note }) {

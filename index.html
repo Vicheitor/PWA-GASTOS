@@ -49,23 +49,65 @@
         </div>
         <button id="logout" type="button" class="link">Salir</button>
       </div>
+      <!-- Pestañas solo en pantallas angostas; en PC ambas vistas van lado a lado. -->
+      <nav class="tabs" aria-label="Secciones">
+        <a href="#gastos" data-tab="gastos">Gastos</a>
+        <a href="#resumen" data-tab="resumen">Resumen</a>
+      </nav>
     </header>
 
-    <main class="screen">
-      <section class="total-card" aria-labelledby="total-label">
-        <span id="total-label">Total del mes</span>
-        <strong id="month-total">$0</strong>
-        <span id="month-count"></span>
+    <main class="screen layout">
+      <section id="view-gastos" aria-label="Gastos">
+        <section class="total-card" aria-labelledby="total-label">
+          <span id="total-label">Total del mes</span>
+          <strong id="month-total">$0</strong>
+          <span id="month-count"></span>
+        </section>
+
+        <div class="filters">
+          <label class="sr-only" for="filter-cat">Filtrar por categoría</label>
+          <select id="filter-cat"></select>
+          <label class="sr-only" for="filter-q">Buscar en notas</label>
+          <input id="filter-q" type="search" placeholder="Buscar en notas" autocomplete="off">
+        </div>
+
+        <div id="expense-list" aria-live="polite"></div>
       </section>
 
-      <div class="filters">
-        <label class="sr-only" for="filter-cat">Filtrar por categoría</label>
-        <select id="filter-cat"></select>
-        <label class="sr-only" for="filter-q">Buscar en notas</label>
-        <input id="filter-q" type="search" placeholder="Buscar en notas" autocomplete="off">
-      </div>
+      <section id="view-resumen" aria-label="Resumen">
+        <div class="kpis">
+          <div class="kpi">
+            <span>Total del mes</span>
+            <strong id="k-total">$0</strong>
+            <small id="k-total-note"></small>
+          </div>
+          <div class="kpi">
+            <span>Promedio diario</span>
+            <strong id="k-avg">$0</strong>
+            <small id="k-avg-note"></small>
+          </div>
+          <div class="kpi kpi-wide">
+            <span>Comparado con el mes anterior</span>
+            <strong id="k-diff">—</strong>
+            <small id="k-diff-note"></small>
+          </div>
+        </div>
 
-      <div id="expense-list" aria-live="polite"></div>
+        <section class="card" aria-labelledby="cat-title">
+          <h3 id="cat-title">Por categoría</h3>
+          <ul id="cat-bars" class="cat-bars"></ul>
+        </section>
+
+        <section class="card" aria-labelledby="daily-title">
+          <h3 id="daily-title">Gasto diario</h3>
+          <div class="chart-box"><canvas id="chart-daily" role="img"></canvas></div>
+        </section>
+
+        <section class="card" aria-labelledby="months-title">
+          <h3 id="months-title">Últimos 12 meses</h3>
+          <div class="chart-box"><canvas id="chart-months" role="img"></canvas></div>
+        </section>
+      </section>
     </main>
 
     <button id="add" type="button" class="fab" aria-label="Agregar gasto">+</button>

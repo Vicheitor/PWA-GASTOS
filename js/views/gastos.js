@@ -1,47 +1,30 @@
 // Vista de gastos: lista del mes agrupada por día, filtros y formulario de alta/edición.
-import { deleteExpense, errorMessage, listExpenses, saveExpense } from '../api.js';
+import { deleteExpense, errorMessage, saveExpense } from '../api.js';
 import { filterExpenses, groupByDay, isEditable, sumAmounts, validateExpense } from '../calc.js';
-import { addMonths, dayLabel, formatCLP, formatThousands, monthLabel, monthRange, parseAmount, todayISO } from '../format.js';
+import { dayLabel, formatCLP, formatThousands, parseAmount, todayISO } from '../format.js';
 import { $, h, toast } from '../dom.js';
 
 const FALLBACK_COLOR = '#64748b';
 const MAX_AMOUNT_DIGITS = 9;
 
 let state = {
-  month: todayISO().slice(0, 7),
   expenses: [],
   categories: [],
   filter: { categoryId: '', query: '' },
-  loading: false,
+  loading: true,
 };
 let editing = null;
-let loadSeq = 0;
+let onChange = async () => {}; // recarga los datos (la define app.js)
 
 const categoryMap = () => new Map(state.categories.map((c) => [c.id, c]));
 const catLabel = (c) => (c.icon ? `${c.icon} ${c.name}` : c.name);
 
 // ---------- Datos ----------
 
-export async function refresh() {
-  const seq = ++loadSeq;
-  state = { ...state, loading: true };
-  try {
-    const expenses = await listExpenses(...monthRange(state.month));
-    if (seq === loadSeq) state = { ...state, expenses };
-  } catch (err) {
-    if (seq === loadSeq) toast(errorMessage(err));
-  } finally {
-    if (seq === loadSeq) {
-      state = { ...state, loading: false };
-      render();
-    }
-  }
-}
-
-function changeMonth(delta) {
-  state = { ...state, month: addMonths(state.month, delta), expenses: [] };
+// expenses = null mientras carga.
+export function showExpenses(expenses) {
+  state = { ...state, expenses: expenses ?? [], loading: expenses === null };
   render();
-  refresh();
 }
 
 function setFilter(patch) {
@@ -85,7 +68,6 @@ function render() {
   const categories = categoryMap();
   const today = todayISO();
 
-  $('#month-label').textContent = monthLabel(state.month);
   $('#total-label').textContent = filtering ? 'Total filtrado' : 'Total del mes';
   $('#month-total').textContent = formatCLP(sumAmounts(visible));
   $('#month-count').textContent = visible.length === 1 ? '1 gasto' : `${visible.length} gastos`;
@@ -164,7 +146,7 @@ async function onSubmit(ev) {
     await saveExpense(row);
     $('#expense-dialog').close();
     toast(editing ? 'Gasto actualizado' : 'Gasto guardado');
-    await refresh();
+    await onChange();
   });
 }
 
@@ -175,7 +157,7 @@ async function onDelete() {
     await deleteExpense(id);
     $('#expense-dialog').close();
     toast('Gasto eliminado');
-    await refresh();
+    await onChange();
   });
 }
 
@@ -187,11 +169,10 @@ function onAmountInput(ev) {
 
 // ---------- Montaje (una vez por carga de página) ----------
 
-export function mountExpenses(categories) {
+export function mountExpenses({ categories, onDataChange }) {
   state = { ...state, categories };
+  onChange = onDataChange;
   renderCategoryControls();
-  $('#month-prev').addEventListener('click', () => changeMonth(-1));
-  $('#month-next').addEventListener('click', () => changeMonth(1));
   $('#filter-cat').addEventListener('change', (e) => setFilter({ categoryId: e.target.value }));
   $('#filter-q').addEventListener('input', (e) => setFilter({ query: e.target.value }));
   $('#add').addEventListener('click', () => openForm());
@@ -200,5 +181,4 @@ export function mountExpenses(categories) {
   $('#f-amount').addEventListener('input', onAmountInput);
   $('#expense-form').addEventListener('submit', onSubmit);
   render();
-  return refresh();
 }
